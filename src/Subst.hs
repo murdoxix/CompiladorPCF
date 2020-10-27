@@ -69,7 +69,7 @@ closeN ns = varChanger lcl (\_ p i -> V p (Bound i))
 -- nombres frescos.
 substN :: [Term] -> Term -> Term
 substN ns = varChanger (\_ p n -> V p (Free n)) bnd
-   where bnd depth p i 
+   where bnd depth p i
              | i <  depth = V p (Bound i)
              | i >= depth && i < depth + nns
                 = nsr !! (i - depth)

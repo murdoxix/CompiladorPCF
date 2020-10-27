@@ -37,10 +37,10 @@ openRename ns t =
 -- a términos fully named abriendo todos las variables de ligadura que va encontrando
 -- Debe tener cuidado de no abrir términos con nombres que ya fueron abiertos.
 openAll :: Term -> NTerm
-openAll (V p v) = case v of 
+openAll (V p v) = case v of
       Bound i ->  V p $ "(Bound "++show i++")" --este caso no debería aparecer
                                                --si el término es localmente cerrado
-      Free x -> V p x 
+      Free x -> V p x
 openAll (Const p c) = Const p c
 openAll (Lam p x ty t) =
     let ([x'], t') = openRename [x] t in
@@ -62,9 +62,10 @@ ppName = id
 
 -- | Pretty printer para tipos (Doc)
 ty2doc :: Ty -> Doc
-ty2doc NatTy     = text "Nat"
+ty2doc NatTy                   = text "Nat"
+ty2doc (NamedTy n ty)          = ty2doc ty
 ty2doc (FunTy x@(FunTy _ _) y) = sep [parens (ty2doc x),text "->",ty2doc y]
-ty2doc (FunTy x y) = sep [ty2doc x,text "->",ty2doc y] 
+ty2doc (FunTy x y)             = sep [ty2doc x,text "->",ty2doc y] 
 
 -- | Pretty printer para tipos (String)
 ppTy :: Ty -> String

@@ -54,8 +54,9 @@ tc (Fix p f fty x xty t) bs = do
          when (dom /= xty) $ do
            failPosPCF p "El tipo del argumento de un fixpoint debe coincidir con el \
                         \dominio del tipo de la función"
-         ty' <- tc (openN [f, x] t) ((x,xty):(f,fty):bs)
-         expect cod ty' t
+         let t' = openN [f, x] t
+         ty' <- tc t' ((x,xty):(f,fty):bs)
+         expect cod ty' t'
          return fty
 
 
@@ -79,18 +80,20 @@ expect ty ty' t = if ty == ty' then return ty
 -- | 'domCod chequea que un tipo sea función
 -- | devuelve un par con el tipo del dominio y el codominio de la función
 domCod :: MonadPCF m => Term -> Ty -> m (Ty, Ty)
+domCod t (NamedTy n ty) = domCod t ty
 domCod t (FunTy d c) = return (d, c)
 domCod t ty = typeError t $ "Se esperaba un tipo función, pero se obtuvo: " ++ ppTy ty
 
 -- | 'tcDecl' chequea el tipo de una declaración
 -- y la agrega al entorno de tipado de declaraciones globales
 tcDecl :: MonadPCF m  => Decl Term -> m ()
-tcDecl (Decl p n t) = do
+tcDecl (Decl p n ty t) = do
     --chequear si el nombre ya está declarado
     mty <- lookupTy n
     case mty of
-        Nothing -> do  --no está declarado 
+        Nothing -> do  --no está declarado
                   s <- get
-                  ty <- tc t (tyEnv s)                 
+                  ty' <- tc t (tyEnv s)
+                  expect ty ty' t
                   addTy n ty
         Just _  -> failPosPCF p $ n ++" ya está declarado"

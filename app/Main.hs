@@ -22,13 +22,15 @@ import Data.Char ( isSpace )
 import Control.Exception ( catch , IOException )
 import System.Environment ( getArgs )
 import System.IO ( stderr, hPutStr )
+import Options.Applicative
 
 import Global ( GlEnv(..) )
 import Errors
 import Lang
 import Parse ( P, tm, program, declOrTm, runP )
-import Elab ( elab, elab_decl )
-import Eval ( eval )
+import Elab ( elab, elab_decl, desugar )
+-- ~ import Eval ( eval )
+import CEK ( exec )
 import PPrint ( pp , ppTy )
 import MonadPCF
 import TypeChecker ( tc, tcDecl )
@@ -37,18 +39,46 @@ prompt :: String
 prompt = "PCF> "
 
 main :: IO ()
-main = do args <- getArgs
-          runPCF (runInputT defaultSettings (main' args))
-          return ()
-          
-main' :: (MonadPCF m, MonadMask m) => [String] -> InputT m ()
-main' args = do
+main = execParser opts >>= go
+  where
+    opts = info (parseArgs <**> helper)
+      ( fullDesc
+        <> progDesc "Compilador de PCF"
+        <> header "Compilador de PCF de la materia Compiladores 2020" )
+
+    go :: (Mode,[FilePath]) -> IO ()
+    go (Interactive,files) =
+      do runPCF (runInputT defaultSettings (repl files))
+         return ()
+    go (Typecheck, files) = undefined
+    go (Bytecompile, files) = undefined
+    go (Run,files) = undefined
+
+data Mode = Interactive
+          | Typecheck
+          | Bytecompile
+          | Run
+
+-- | Parser de banderas
+parseMode :: Parser Mode
+parseMode =
+      flag' Typecheck ( long "typecheck" <> short 't' <> help "Solo chequear tipos")
+  <|> flag' Bytecompile (long "bytecompile" <> short 'c' <> help "Compilar a la BVM")
+  <|> flag' Run (long "run" <> short 'r' <> help "Ejecutar bytecode en la BVM")
+  <|> flag Interactive Interactive ( long "interactive" <> short 'i'<> help "Ejecutar en forma interactiva" )
+
+-- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar
+parseArgs :: Parser (Mode,[FilePath])
+parseArgs = (,) <$> parseMode <*> many (argument str (metavar "FILES..."))
+
+repl :: (MonadPCF m, MonadMask m) => [String] -> InputT m ()
+repl args = do
         lift $ catchErrors $ compileFiles args
         s <- lift $ get
         when (inter s) $ liftIO $ putStrLn
           (  "Entorno interactivo para PCF0.\n"
           ++ "Escriba :? para recibir ayuda.")
-        loop  
+        loop
   where loop = do
            minput <- getInputLine prompt
            case minput of
@@ -82,12 +112,16 @@ parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
-handleDecl ::  MonadPCF m => Decl NTerm -> m ()
-handleDecl (Decl p x t) = do
-        let tt = elab t
-        tcDecl (Decl p x tt)    
-        te <- eval tt
-        addDecl (Decl p x te)
+handleDecl ::  MonadPCF m => SDecl STerm -> m ()
+handleDecl d = do
+        mde <- elab_decl d
+        case mde of
+          Nothing ->
+            return ()
+          Just de@(Decl p x ty t) ->
+            do tcDecl de
+               te <- exec t
+               addDecl (Decl p x ty te)
 
 data Command = Compile CompileForm
              | Print String
@@ -165,35 +199,38 @@ compilePhrase ::  MonadPCF m => String -> m ()
 compilePhrase x =
   do
     dot <- parseIO "<interactive>" declOrTm x
-    case dot of 
+    case dot of
       Left d  -> handleDecl d
       Right t -> handleTerm t
 
-handleTerm ::  MonadPCF m => NTerm -> m ()
+handleTerm ::  MonadPCF m => STerm -> m ()
 handleTerm t = do
-         let tt = elab t
+         tt <- elab t
          s <- get
          ty <- tc tt (tyEnv s)
-         te <- eval tt
+         te <- exec tt
          printPCF (pp te ++ " : " ++ ppTy ty)
 
 printPhrase   :: MonadPCF m => String -> m ()
 printPhrase x =
   do
     x' <- parseIO "<interactive>" tm x
-    let ex = elab x'
-    t  <- case x' of 
-           (V p f) -> maybe ex id <$> lookupDecl f
-           _       -> return ex  
-    printPCF "NTerm:"
+    nx <- desugar x'
+    ex <- elab x'
+    t  <- case x' of
+           (SV p f) -> maybe ex id <$> lookupDecl f
+           _        -> return ex
+    printPCF "STerm:"
     printPCF (show x')
+    printPCF "\nNTerm:"
+    printPCF (show nx)
     printPCF "\nTerm:"
     printPCF (show t)
 
 typeCheckPhrase :: MonadPCF m => String -> m ()
 typeCheckPhrase x = do
          t <- parseIO "<interactive>" tm x
-         let tt = elab t
+         tt <- elab t
          s <- get
          ty <- tc tt (tyEnv s)
          printPCF (ppTy ty)

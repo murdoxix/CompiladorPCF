@@ -26,6 +26,9 @@ dependencies:
 - pretty
 - mtl
 - exceptions
+- optparse-applicative
+- binary
+- bytestring
 
 
 library:

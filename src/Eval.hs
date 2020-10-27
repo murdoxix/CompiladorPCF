@@ -32,7 +32,7 @@ eval (App p l r) = do
      case (le, re) of
         (Lam _ y _ m, n) ->
            eval (subst n m)
-        (ff@(Fix p f _ _ _ t), n) ->
+        (ff@(Fix _ f _ _ _ t), n) ->
            eval (substN [ff, n] t)
         _ ->
            abort("Error de tipo en runtime " ++ show (le, re))
@@ -47,6 +47,7 @@ eval (UnaryOp p Pred t) = do
         case te of
           Const _ (CNat n) -> return (Const p (CNat (max 0 (n-1))))
           _                -> abort ("Error de tipo en runtime!")
+
 eval (IfZ p c t e) = do
      ce <- eval c
      case ce of

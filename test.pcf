@@ -1,0 +1,14 @@
+let rec doble (x:Nat) : Nat = ifz x then 0 else succ (succ (doble (pred x)))
+
+let rec ack (m:Nat) (n:Nat) : Nat =
+  ifz m
+  then succ n
+  else (ifz n
+    then ack (pred m) 1
+    else ack (pred m) (ack m (pred n)))
+
+let rec suma (m n:Nat) : Nat = 
+  ifz n then m else succ (suma m (pred n))
+
+let rec resta (m n:Nat) : Nat =
+  ifz n then m else pred (resta m (pred n))
