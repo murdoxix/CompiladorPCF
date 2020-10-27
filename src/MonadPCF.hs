@@ -33,7 +33,6 @@ module MonadPCF (
 import Common
 import Lang
 import Global
-import PPrint
 import Errors ( Error(..) )
 import Control.Monad.State
 import Control.Monad.Except

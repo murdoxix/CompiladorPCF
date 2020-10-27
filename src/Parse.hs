@@ -94,6 +94,7 @@ unaryOpName =
       (reserved "succ" >> return Succ)
   <|> (reserved "pred" >> return Pred)
 
+
 unaryOp :: P STerm
 unaryOp = do
   i <- getPos

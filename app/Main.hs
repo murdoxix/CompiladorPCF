@@ -185,7 +185,7 @@ handleCommand cmd = do
        Quit   ->  return False
        Noop   ->  return True
        Help   ->  printPCF (helpTxt commands) >> return True
-       Browse ->  do  printPCF (unlines [ s | s <- reverse (nub (map declName glb)) ])
+       Browse ->  do  printPCF (unlines [ name | name <- reverse (nub (map declName glb)) ])
                       return True
        Compile c ->
                   do  case c of
