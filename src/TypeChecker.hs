@@ -61,7 +61,7 @@ tc (Fix p f fty x xty t) bs = do
 tc tt@(Let p v ty t e) bs = do tty <- tc t bs
                                when (ty /= tty) $ failPosPCF p $ "El tipo dado de\n"++v++" : "++(ppTy ty)++"\n\
                                \no coincide con el tipo de\n"++(pp t)++" : "++(ppTy tty)++"\nen la expresión\n"++pp tt
-                               tc e ((v,ty):bs)
+                               tc (open v e) ((v,ty):bs)
 
 -- | @'typeError' t s@ lanza un error de tipo para el término @t@ 
 typeError :: MonadPCF m => Term   -- ^ término que se está chequeando  

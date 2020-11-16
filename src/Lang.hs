@@ -148,6 +148,7 @@ data Frame =
   | KClos Clos
   | KIfZ Env Term Term
   | KUnaryOp UnaryOp
+  | KLet Env Term -- ρ · let □ in t
   deriving Show
 
 type Kont = [Frame]

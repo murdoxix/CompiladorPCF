@@ -44,6 +44,9 @@ search (V _ (Free x)) p k =
 search (Const _ n) p k =
   destroy (VConst n) k
 
+search (Let _ _ _ t1 t2) p k =
+  search t1 p ((KLet p t2):k)
+
 search lamOrFix p k =
   destroy (VClos $ Clos p lamOrFix) k
 
@@ -66,6 +69,9 @@ destroy (VConst (CNat _)) (KIfZ p t e : k) =
 
 destroy (VClos clos) (KArg p t : k) =
   search t p (KClos clos : k)
+
+destroy v (KLet p t : k) =
+  search t (v : p) k
 
 destroy v (KClos (Clos p (Lam _ _ _ t)) : k) =
   search t (v : p) k

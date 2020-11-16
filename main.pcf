@@ -1,1 +1,1 @@
-let main:Nat = resta 39 2
+let main:Nat = resta 25 5
