@@ -94,10 +94,13 @@ data Tm info var =
   | UnaryOp info UnaryOp (Tm info var)
   | Fix info Name Ty Name Ty (Tm info var)
   | IfZ info (Tm info var) (Tm info var) (Tm info var)
+  | Let info Name Ty (Tm info var) (Tm info var)
   deriving (Show, Functor)
 
 type NTerm = Tm Pos Name   -- ^ 'Tm' tiene 'Name's como variables ligadas y libres, guarda posición
 type Term = Tm Pos Var     -- ^ 'Tm' con índices de De Bruijn como variables ligadas, different type of variables, guarda posición
+
+type Module = [Decl Term]
 
 data Var =
     Bound !Int
@@ -113,8 +116,9 @@ getInfo (App i _ _ )      = i
 getInfo (UnaryOp i _ _)   = i
 getInfo (Fix i _ _ _ _ _) = i
 getInfo (IfZ i _ _ _)     = i
+getInfo (Let i _ _ _ _)   = i
 
--- | Obtiene las variables libres de un término.
+-- | Obtiene las variables libres de un término LC.
 freeVars :: Tm info Var -> [Name]
 freeVars (V _ (Free v))    = [v]
 freeVars (V _ _)           = []
@@ -124,6 +128,7 @@ freeVars (UnaryOp _ _ t)   = freeVars t
 freeVars (Fix _ _ _ _ _ t) = freeVars t
 freeVars (IfZ _ c t e)     = freeVars c ++ freeVars t ++ freeVars e
 freeVars (Const _ _)       = []
+freeVars (Let _ _ _ e1 e2) = freeVars e1 ++ freeVars e2
 
 -- | Clausura. El término incluye a Lam o Fix.
 data Clos = Clos Env Term
@@ -146,11 +151,3 @@ data Frame =
   deriving Show
 
 type Kont = [Frame]
-
--- | Valores de la pila de la máquina BVM.
-data PVal =
-    I Int
-  | Fun Env Bytecode
-  | RA Env Bytecode
-
-type Pila = [PVal]

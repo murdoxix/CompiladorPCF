@@ -19,6 +19,7 @@ import Control.Monad.Catch (MonadMask)
 import Control.Monad.Trans
 import Data.List (nub,  intersperse, isPrefixOf )
 import Data.Char ( isSpace )
+import Data.Maybe ( fromJust, isJust )
 import Control.Exception ( catch , IOException )
 import System.Environment ( getArgs )
 import System.IO ( stderr, hPutStr )
@@ -29,7 +30,7 @@ import Errors
 import Lang
 import Parse ( P, tm, program, declOrTm, runP )
 import Elab ( elab, elab_decl, desugar )
--- ~ import Eval ( eval )
+import Bytecompile ( bytecompileModule, bcWrite, runBC, bcRead )
 import CEK ( exec )
 import PPrint ( pp , ppTy )
 import MonadPCF
@@ -47,12 +48,18 @@ main = execParser opts >>= go
         <> header "Compilador de PCF de la materia Compiladores 2020" )
 
     go :: (Mode,[FilePath]) -> IO ()
-    go (Interactive,files) =
-      do runPCF (runInputT defaultSettings (repl files))
-         return ()
-    go (Typecheck, files) = undefined
-    go (Bytecompile, files) = undefined
-    go (Run,files) = undefined
+    go (Interactive,files) = void $ runPCF $ catchErrors $ runInputT defaultSettings (repl files)
+    go (Typecheck, files) = void $ runPCF $ catchErrors $ verifyFiles files
+    go (Bytecompile, files) = void $ runPCF $ catchErrors $
+      ( do asModules <- verifyFiles files
+           let oneModule = foldl (++) [] asModules
+           bytecode <- bytecompileModule oneModule
+           let lastFile = last files
+               fileByte = ((++ "byte") . take (length lastFile - 3)) lastFile
+           liftIO $ bcWrite bytecode fileByte )
+    go (Run,files) = void $ runPCF $ catchErrors
+      ( do asBytecodes <- liftIO $ mapM bcRead files
+           mapM_ runBC asBytecodes )
 
 data Mode = Interactive
           | Typecheck
@@ -73,7 +80,7 @@ parseArgs = (,) <$> parseMode <*> many (argument str (metavar "FILES..."))
 
 repl :: (MonadPCF m, MonadMask m) => [String] -> InputT m ()
 repl args = do
-        lift $ catchErrors $ compileFiles args
+        lift $ compileFiles args
         s <- lift $ get
         when (inter s) $ liftIO $ putStrLn
           (  "Entorno interactivo para PCF0.\n"
@@ -88,7 +95,15 @@ repl args = do
                        c <- liftIO $ interpretCommand x
                        b <- lift $ catchErrors $ handleCommand c
                        maybe loop (flip when loop) b
- 
+
+verifyFiles ::  MonadPCF m => [String] -> m [Module]
+verifyFiles [] = return []
+verifyFiles (x:xs) = do
+        modify (\s -> s { lfile = x, inter = False })
+        verified <- verifyFile x
+        restVerified <- verifyFiles xs
+        return (verified : restVerified)
+
 compileFiles ::  MonadPCF m => [String] -> m ()
 compileFiles []     = return ()
 compileFiles (x:xs) = do
@@ -96,32 +111,47 @@ compileFiles (x:xs) = do
         compileFile x
         compileFiles xs
 
-compileFile ::  MonadPCF m => String -> m ()
-compileFile f = do
-    printPCF ("Abriendo "++f++"...")
+parseFile :: MonadPCF m => String -> m [SDecl STerm]
+parseFile f = do
     let filename = reverse(dropWhile isSpace (reverse f))
+    printPCF ("Abriendo "++filename++"...")
+    when ((drop (length f -4) filename) /= ".pcf") $ failPCF $ "El archivo "++filename++" no tiene extensión .pcf"
     x <- liftIO $ catch (readFile filename)
                (\e -> do let err = show (e :: IOException)
                          hPutStr stderr ("No se pudo abrir el archivo " ++ filename ++ ": " ++ err ++"\n")
                          return "")
-    decls <- parseIO filename program x
-    mapM_ handleDecl decls
+    parseIO filename program x
+
+compileFile :: MonadPCF m => String -> m ()
+compileFile f = parseFile f >>= mapM_ handleDecl
+
+verifyFile :: MonadPCF m => String -> m Module
+verifyFile f = parseFile f >>= mapM verifyDecl >>= return.(map fromJust).(filter isJust)
 
 parseIO ::  MonadPCF m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
+verifyDecl ::  MonadPCF m => SDecl STerm -> m (Maybe (Decl Term))
+verifyDecl d = do
+        mde <- elab_decl d
+        case mde of
+          Nothing -> return Nothing
+          Just de@(Decl p x ty t) ->
+            do tcDecl de
+               return $ Just de
+
 handleDecl ::  MonadPCF m => SDecl STerm -> m ()
 handleDecl d = do
         mde <- elab_decl d
         case mde of
-          Nothing ->
-            return ()
+          Nothing -> return ()
           Just de@(Decl p x ty t) ->
             do tcDecl de
                te <- exec t
                addDecl (Decl p x ty te)
+               return ()
 
 data Command = Compile CompileForm
              | Print String

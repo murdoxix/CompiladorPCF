@@ -49,7 +49,10 @@ openAll (Fix p f fty x xty t) =
     let ([f', x'], t') = openRename [f, x] t in
     Fix p f' fty x' xty (openAll t')
 openAll (IfZ p c t e) = IfZ p (openAll c) (openAll t) (openAll e)
-openAll (UnaryOp i o t) = UnaryOp i o (openAll t)
+openAll (UnaryOp p o t) = UnaryOp p o (openAll t)
+openAll (Let p v ty t e) = 
+    let ([v'], e') = openRename [v] e in
+    Let p v' ty  (openAll t) (openAll e')
 
 -- | Pretty printer de nombres (Doc)
 name2doc :: Name -> Doc
@@ -120,6 +123,10 @@ t2doc at (IfZ _ c t e) =
 t2doc at (UnaryOp _ o t) =
   parenIf at $
   unary2doc o <+> t2doc True t
+
+t2doc at (Let _ v ty t e) =
+  parenIf at $
+  sep [ text "let",name2doc v,text ":",ty2doc ty,text "=",t2doc False t,text "in",t2doc False e]
 
 binding2doc :: (Name, Ty) -> Doc
 binding2doc (x, ty) =

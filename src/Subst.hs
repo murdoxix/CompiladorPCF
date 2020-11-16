@@ -22,14 +22,15 @@ varChanger :: (Int -> Pos -> Name -> Term) --que hacemos con las variables local
            -> (Int -> Pos -> Int ->  Term) --que hacemos con los indices de De Bruijn
            -> Term -> Term
 varChanger local bound t = go 0 t where
-  go n   (V p (Bound i)) = bound n p i
-  go n   (V p (Free x)) = local n p x 
-  go n (Lam p y ty t)   = Lam p y ty (go (n+1) t)
-  go n (App p l r)   = App p (go n l) (go n r)
+  go n   (V p (Bound i))     = bound n p i
+  go n   (V p (Free x))      = local n p x 
+  go n (Lam p y ty t)        = Lam p y ty (go (n+1) t)
+  go n (App p l r)           = App p (go n l) (go n r)
   go n (Fix p f fty x xty t) = Fix p f fty x xty (go (n+2) t)
-  go n (IfZ p c t e) = IfZ p (go n c) (go n t) (go n e)
-  go n t@(Const _ _) = t
-  go n (UnaryOp p op t) = UnaryOp p op (go n t)
+  go n (IfZ p c t e)         = IfZ p (go n c) (go n t) (go n e)
+  go n t@(Const _ _)         = t
+  go n (UnaryOp p op t)      = UnaryOp p op (go n t)
+  go n (Let p v ty t e)      = Let p v ty (go n t) (go (n+1) e)
 
 -- `openN [nn,..,n0] t` reemplaza las primeras (n+1) variables ligadas
 -- en `t` (que debe ser localmente cerrado) por los nombres libres en la

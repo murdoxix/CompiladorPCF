@@ -10,7 +10,7 @@ Este módulo permite elaborar términos y declaraciones para convertirlas desde
 fully named (@NTerm) a locally closed (@Term@) 
 -}
 
-module Elab ( elab, elab', elab_decl, desugar ) where
+module Elab ( elab, elab_decl, desugar ) where
 
 import Lang
 import Subst
@@ -43,7 +43,7 @@ desugar (SLet p x [] ty t t') =
   do tyd <- desugar_type ty
      td  <- desugar t
      t'd <- desugar t'
-     return (App p (Lam p x tyd t'd) td)
+     return (Let p x tyd td t'd)
 
 desugar (SLet p f [(x, ty)] ty' t t') =
   desugar $ SLet p f [] (SFunTy ty ty') (SLam p [(x, ty)] t) t'
@@ -107,15 +107,16 @@ helper ((_,ty):ls) ty' = SFunTy ty $ helper ls ty'
 elab :: MonadPCF m => STerm -> m Term
 elab stm = do desugared <- desugar stm
               return $ elab' desugared
-
-elab' :: NTerm -> Term
-elab' (V p v)               = V p (Free v)
-elab' (Const p c)           = Const p c
-elab' (Lam p v ty t)        = Lam p v ty (close v (elab' t))
-elab' (App p h a)           = App p (elab' h) (elab' a)
-elab' (Fix p f fty x xty t) = Fix p f fty x xty (closeN [f, x] (elab' t))
-elab' (IfZ p c t e)         = IfZ p (elab' c) (elab' t) (elab' e)
-elab' (UnaryOp i o t)       = UnaryOp i o (elab' t)
+  where
+    elab' :: NTerm -> Term
+    elab' (V p v)               = V p (Free v)
+    elab' (Const p c)           = Const p c
+    elab' (Lam p v ty t)        = Lam p v ty (close v (elab' t))
+    elab' (App p h a)           = App p (elab' h) (elab' a)
+    elab' (Fix p f fty x xty t) = Fix p f fty x xty (closeN [f, x] (elab' t))
+    elab' (IfZ p c t e)         = IfZ p (elab' c) (elab' t) (elab' e)
+    elab' (UnaryOp p o t)       = UnaryOp p o (elab' t)
+    elab' (Let p v ty t e)      = Let p v ty (elab' t) (close v (elab' e))
 
 desugar_decl :: MonadPCF m => SDecl STerm -> m (Maybe (Decl STerm))
 desugar_decl (SSynonymDecl p n ty) =

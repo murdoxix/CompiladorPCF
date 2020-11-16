@@ -14,7 +14,8 @@ module Bytecompile
   (Bytecode, bytecompileModule, runBC, bcWrite, bcRead)
  where
 
-import Lang 
+import Common ( Pos( NoPos ) )
+import Lang
 import Subst
 import MonadPCF
 
@@ -27,6 +28,15 @@ type Opcode = Int
 type Bytecode = [Int]
 
 newtype Bytecode32 = BC { un32 :: [Word32] }
+
+-- | Valores de la pila de la máquina BVM.
+data PVal =
+    I Int
+  | Fun BVMEnv Bytecode
+  | RA BVMEnv Bytecode
+
+type Pila = [PVal]
+type BVMEnv = Pila
 
 {- Esta instancia explica como codificar y decodificar Bytecode de 32 bits -}
 instance Binary Bytecode32 where
@@ -72,7 +82,7 @@ pattern PRINT    = 14
 bc :: MonadPCF m => Term -> m Bytecode
 bc (V _ (Bound i)) = return [ACCESS, i]
 
-bc (V _ (Free v)) = error $ "Error de compilación. Está la variable " ++ v ++ " libre. Los términos deberían ser cerrados"
+bc (V _ (Free v)) = failPCF $ "Error de compilación. Está la variable " ++ v ++ " libre. Los términos deberían ser cerrados."
 
 bc (Const _ (CNat n)) = return [CONST, n]
 
@@ -80,7 +90,7 @@ bc (Lam _ _ _ t) = bc t >>= (\ct -> return ([FUNCTION, length ct + 1]++ct++[RETU
 
 bc (App _ f e) = do cf <- bc f
                     ce <- bc e
-                    return (cf++ce++[RETURN])
+                    return (cf++ce++[CALL])
 
 bc (UnaryOp _ Succ e) = bc e >>= (\ce -> return (ce++[SUCC]))
 
@@ -88,26 +98,25 @@ bc (UnaryOp _ Pred e) = bc e >>= (\ce -> return (ce++[PRED]))
 
 bc (Fix _ _ _ _ _ e) = bc e >>= (\ce -> return ([FUNCTION, length ce + 1]++ce++[RETURN, FIX]))
 
-bc (IfZ _ e t1 t2) = error "implementame"
+bc (IfZ _ e t1 t2) = do ce <- bc e
+                        ct1 <- bc t1
+                        ct2 <- bc t2
+                        return (ce++[IFZ,length ct1 + 2]++ct1++[JUMP,length ct2]++ct2)
 
+bc (Let _ _ _ e1 e2) = do ce1 <- bc e1
+                          ce2 <- bc e2
+                          return (ce1++[SHIFT]++ce2++[DROP])
 
--- ~ data Tm info var =
-    -- ~ V info var
-  -- ~ | Const info Const
-  -- ~ | Lam info Name Ty (Tm info var)
-  -- ~ | App info (Tm info var) (Tm info var)
-  -- ~ | UnaryOp info UnaryOp (Tm info var)
-  -- ~ | Fix info Name Ty Name Ty (Tm info var)
-  -- ~ | IfZ info (Tm info var) (Tm info var) (Tm info var)
-  -- ~ deriving (Show, Functor)
-  
--- ~ data Var =
-    -- ~ Bound !Int
-  -- ~ | Free Name
-  -- ~ deriving Show
-
--- ~ bytecompileModule :: MonadPCF m => Module -> m Bytecode
-bytecompileModule mod = error "implementame"
+bytecompileModule :: MonadPCF m => Module -> m Bytecode
+bytecompileModule mod = translate mod >>= bc >>= (\cmod -> return $ cmod ++ [PRINT, STOP])
+  where
+    translate [] = failPCF "Error de compilación de módulo. Debe haber al menos una declaración."
+    translate ((Decl{declPos = p, declName = v, declType = ty, declBody = e}):[]) =
+      if ty == NatTy
+        then return e
+        else failPCF "Error de compilación de módulo. La última declaración debe ser de tipo Nat."
+    translate ((Decl{declPos = p, declName = v, declType = ty, declBody = e}):xs) =
+      translate xs >>= (\txs -> return (Let p v ty e (close v txs)))
 
 -- | Toma un bytecode, lo codifica y lo escribe un archivo 
 bcWrite :: Bytecode -> FilePath -> IO ()
@@ -122,6 +131,36 @@ bcRead :: FilePath -> IO Bytecode
 bcRead filename = map fromIntegral <$> un32  <$> decode <$> BS.readFile filename
 
 runBC :: MonadPCF m => Bytecode -> m ()
-runBC c = error "implementame"
+runBC c = runBVM c [] []
 
--- ~ runBVM :: 
+runBVM :: MonadPCF m => Bytecode -> BVMEnv -> Pila -> m ()
+runBVM (RETURN:_) _ (v:(RA e c):s) = runBVM c e (v:s)
+
+runBVM (CONST:n:c) e s = runBVM c e ((I n):s)
+
+runBVM (ACCESS:i:c) e s = runBVM c e (e!!i:s)
+
+runBVM (FUNCTION:l:cfYc) e s = runBVM (drop l cfYc) e ((Fun e cfYc):s)
+
+runBVM (CALL:c) e (v:(Fun ef cf):s) = runBVM cf (v:ef) ((RA e c):s)
+
+runBVM (SUCC:c) e ((I n):s) = runBVM c e ((I (n+1)):s)
+
+runBVM (PRED:c) e ((I n):s) = runBVM c e ((I $ max 0 (n-1)):s)
+
+runBVM (IFZ:lct1:c) e ((I ve):s) = if ve == 0
+                                     then runBVM c e s
+                                     else runBVM (drop lct1 c) e s
+
+runBVM (FIX:c) e ((Fun ce cf):s) = let efix = (Fun efix cf) : ce
+                                   in runBVM c e ((Fun efix cf):s)
+
+runBVM (STOP:_) _ _ = return ()
+
+runBVM (JUMP:n:c) e s = runBVM (drop n c) e s
+
+runBVM (SHIFT:c) e (v:s) = runBVM c (v:e) s
+
+runBVM (DROP:c) (v:e) s = runBVM c e s
+
+runBVM (PRINT:c) e ((I n):s) = (printPCF $ show n) >> runBVM c e ((I n):s)

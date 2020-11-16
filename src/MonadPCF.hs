@@ -103,7 +103,7 @@ type PCF = StateT GlEnv (ExceptT Error IO)
 -- | Esta es una instancia vacía, ya que 'MonadPCF' no tiene funciones miembro.
 instance MonadPCF PCF
 
--- 'runPCF\'' corre una computación de la mónad 'PCF' en el estado inicial 'Global.initialEnv' 
+-- 'runPCF\'' corre una computación de la mónada 'PCF' en el estado inicial 'Global.initialEnv'
 runPCF' :: PCF a -> IO (Either Error (a, GlEnv))
 runPCF' c =  runExceptT $ runStateT c initialEnv
 
