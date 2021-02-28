@@ -32,6 +32,7 @@ import Parse ( P, tm, program, declOrTm, runP )
 import Elab ( elab, elab_decl, desugar )
 import Bytecompile ( bytecompileModule, bcWrite, runBC, bcRead )
 import CEK ( exec )
+-- ~ import Eval ( eval )
 import PPrint ( pp , ppTy )
 import MonadPCF
 import TypeChecker ( tc, tcDecl )

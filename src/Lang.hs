@@ -22,7 +22,7 @@ import Common ( Pos )
 
 -- | AST de Tipos superficiales
 data SugaredTy info =
-      SNatTy 
+      SNatTy
     | STyName info Name
     | SFunTy (SugaredTy info) (SugaredTy info)
     deriving (Show,Eq)
@@ -52,6 +52,9 @@ data Const = CNat Int
 data UnaryOp = Succ | Pred
   deriving (Show,Eq)
 
+data BinaryOp = Sum | Sub
+  deriving (Show,Eq)
+
 -- | tipo de datos de declaraciones azucaradas, parametrizado por el tipo del cuerpo de la declaración
 data SDecl a =
     SDecl { sdeclPos :: Pos, sdeclName :: Name, sdeclArgs :: [(Name, STy)], sdeclType :: STy, sdeclBody :: a }
@@ -76,6 +79,7 @@ data STm info var =
   | SLam info [(Name, STy)] (STm info var)
   | SApp info (STm info var) (STm info var)
   | SUnaryOp info UnaryOp
+  | SBinaryOp info BinaryOp
   | SFix info Name STy Name STy (STm info var)
   | SIfZ info (STm info var) (STm info var) (STm info var)
   deriving (Show, Functor)
@@ -92,6 +96,7 @@ data Tm info var =
   | Lam info Name Ty (Tm info var)
   | App info (Tm info var) (Tm info var)
   | UnaryOp info UnaryOp (Tm info var)
+  | BinaryOp info BinaryOp (Tm info var) (Tm info var)
   | Fix info Name Ty Name Ty (Tm info var)
   | IfZ info (Tm info var) (Tm info var) (Tm info var)
   | Let info Name Ty (Tm info var) (Tm info var)
@@ -109,26 +114,28 @@ data Var =
 
 -- | Obtiene la info en la raíz del término.
 getInfo :: Tm info var -> info
-getInfo (V i _)           = i
-getInfo (Const i _)       = i
-getInfo (Lam i _ _ _)     = i
-getInfo (App i _ _ )      = i
-getInfo (UnaryOp i _ _)   = i
-getInfo (Fix i _ _ _ _ _) = i
-getInfo (IfZ i _ _ _)     = i
-getInfo (Let i _ _ _ _)   = i
+getInfo (V i _)            = i
+getInfo (Const i _)        = i
+getInfo (Lam i _ _ _)      = i
+getInfo (App i _ _ )       = i
+getInfo (UnaryOp i _ _)    = i
+getInfo (BinaryOp i _ _ _) = i
+getInfo (Fix i _ _ _ _ _)  = i
+getInfo (IfZ i _ _ _)      = i
+getInfo (Let i _ _ _ _)    = i
 
 -- | Obtiene las variables libres de un término LC.
 freeVars :: Tm info Var -> [Name]
-freeVars (V _ (Free v))    = [v]
-freeVars (V _ _)           = []
-freeVars (Lam _ _ _ t)     = freeVars t
-freeVars (App _ l r)       = freeVars l ++ freeVars r
-freeVars (UnaryOp _ _ t)   = freeVars t
-freeVars (Fix _ _ _ _ _ t) = freeVars t
-freeVars (IfZ _ c t e)     = freeVars c ++ freeVars t ++ freeVars e
-freeVars (Const _ _)       = []
-freeVars (Let _ _ _ e1 e2) = freeVars e1 ++ freeVars e2
+freeVars (V _ (Free v))       = [v]
+freeVars (V _ _)              = []
+freeVars (Lam _ _ _ t)        = freeVars t
+freeVars (App _ l r)          = freeVars l ++ freeVars r
+freeVars (UnaryOp _ _ t)      = freeVars t
+freeVars (BinaryOp _ _ e1 e2) = freeVars e1 ++ freeVars e2
+freeVars (Fix _ _ _ _ _ t)    = freeVars t
+freeVars (IfZ _ c t e)        = freeVars c ++ freeVars t ++ freeVars e
+freeVars (Const _ _)          = []
+freeVars (Let _ _ _ e1 e2)    = freeVars e1 ++ freeVars e2
 
 -- | Clausura. El término incluye a Lam o Fix.
 data Clos = Clos Env Term

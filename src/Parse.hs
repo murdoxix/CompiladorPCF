@@ -31,7 +31,7 @@ lexer = Tok.makeTokenParser $
          reservedNames = ["let", "fun", "fix", "then", "else",
                           "succ", "pred", "ifz", "Nat", "in",
                           "rec", "type"],
-         reservedOpNames = ["->",":","="]
+         reservedOpNames = ["->", ":", "=", "+", "-"]
         }
 
 whiteSpace :: P ()
@@ -94,17 +94,28 @@ unaryOpName =
       (reserved "succ" >> return Succ)
   <|> (reserved "pred" >> return Pred)
 
-
 unaryOp :: P STerm
 unaryOp = do
   i <- getPos
   o <- unaryOpName
   return (SUnaryOp i o)
 
+binaryOpName :: P BinaryOp
+binaryOpName =
+      (reservedOp "+" >> return Sum)
+  <|> (reservedOp "-" >> return Sub)
+
+binaryOp :: P STerm
+binaryOp = do
+  i <- getPos
+  o <- binaryOpName
+  return (SBinaryOp i o)
+
 atom :: P STerm
 atom =     (flip SConst <$> const <*> getPos)
        <|> flip SV <$> var <*> getPos
        <|> unaryOp
+       <|> binaryOp
        <|> parens tm
 
 lam :: P STerm
@@ -115,7 +126,7 @@ lam = do i <- getPos
          t <- tm
          return (SLam i args t)
 
--- Nota el parser app también parsea un solo atom.
+-- Nota: el parser app también parsea un solo atom.
 app :: P STerm
 app = (do i <- getPos
           f <- atom

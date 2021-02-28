@@ -58,6 +58,8 @@
 #define SHIFT    12
 #define DROP     13
 #define PRINT    14
+#define SUM      15
+#define SUB      16
 #define ADD      20
 
 #define CHUNK 4096
@@ -239,6 +241,25 @@ void run(code init_c)
 			break;
 		}
 
+		case SUM: {
+			/* Suma: en el tope de la pila esta el segundo argumento
+       * y por debajo el primero, los sumamos. */      
+      s[-2].i += s[-1].i;
+      s--;
+			break;
+		}
+
+		case SUB: {
+      /* Resta: en el tope de la pila esta el segundo argumento
+       * y por debajo el primero, los restamos. */
+			if (s[-2].i - s[-1].i > 0)
+				s[-2].i -= s[-1].i;
+      else
+        s[-2].i = 0;
+      s--;
+			break;
+		}
+    
 		case RETURN: {
 			/* Return: tenemos en el stack un valor y una dirección,
 			 * y entorno, de retorno. Saltamos a la dirección

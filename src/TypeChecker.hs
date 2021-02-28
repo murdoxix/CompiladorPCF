@@ -18,8 +18,7 @@ import MonadPCF
 import PPrint
 import Subst
 
-
--- | 'tc' chequea y devuelve el tipo de un término 
+-- | 'tc' chequea y devuelve el tipo de un término
 -- Si el término no está bien tipado, lanza un error
 -- usando la interfaz de las mónadas @MonadPCF@.
 tc :: MonadPCF m => Term         -- ^ término a chequear
@@ -33,6 +32,11 @@ tc (Const _ (CNat n)) _ = return NatTy
 tc (UnaryOp p u t) bs = do 
       ty <- tc t bs
       expect NatTy ty t
+tc (BinaryOp p b t u) bs = do 
+      tyt <- tc t bs
+      expect NatTy tyt t
+      tyu <- tc u bs
+      expect NatTy tyu u
 tc (IfZ p c t t') bs = do
        tyc  <- tc c bs
        expect NatTy tyc c

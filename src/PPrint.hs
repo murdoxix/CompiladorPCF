@@ -50,6 +50,7 @@ openAll (Fix p f fty x xty t) =
     Fix p f' fty x' xty (openAll t')
 openAll (IfZ p c t e) = IfZ p (openAll c) (openAll t) (openAll e)
 openAll (UnaryOp p o t) = UnaryOp p o (openAll t)
+openAll (BinaryOp p o t u) = BinaryOp p o (openAll t) (openAll u)
 openAll (Let p v ty t e) = 
     let ([v'], e') = openRename [v] e in
     Let p v' ty  (openAll t) (openAll e')
@@ -79,6 +80,10 @@ c2doc (CNat n) = text (show n)
 unary2doc :: UnaryOp -> Doc
 unary2doc Succ = text "succ"
 unary2doc Pred = text "pred"
+
+binary2doc :: BinaryOp -> Doc
+binary2doc Sum = text "+"
+binary2doc Sub = text "-"
 
 collectApp :: NTerm -> (NTerm, [NTerm])
 collectApp t = go [] t where
@@ -123,6 +128,10 @@ t2doc at (IfZ _ c t e) =
 t2doc at (UnaryOp _ o t) =
   parenIf at $
   unary2doc o <+> t2doc True t
+
+t2doc at (BinaryOp _ o t h) =
+  parenIf at $
+  t2doc True t <+> binary2doc o <+> t2doc True h
 
 t2doc at (Let _ v ty t e) =
   parenIf at $

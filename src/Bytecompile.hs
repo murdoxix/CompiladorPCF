@@ -78,6 +78,8 @@ pattern JUMP     = 11
 pattern SHIFT    = 12
 pattern DROP     = 13
 pattern PRINT    = 14
+pattern SUM      = 15
+pattern SUB      = 16
 
 bc :: MonadPCF m => Term -> m Bytecode
 bc (V _ (Bound i)) = return [ACCESS, i]
@@ -95,6 +97,14 @@ bc (App _ f e) = do cf <- bc f
 bc (UnaryOp _ Succ e) = bc e >>= (\ce -> return (ce++[SUCC]))
 
 bc (UnaryOp _ Pred e) = bc e >>= (\ce -> return (ce++[PRED]))
+
+bc (BinaryOp _ Sum t1 t2) = do ct1 <- bc t1
+                               ct2 <- bc t2 
+                               return (ct1++ct2++[SUM])
+
+bc (BinaryOp _ Sub t1 t2) = do ct1 <- bc t1
+                               ct2 <- bc t2 
+                               return (ct1++ct2++[SUB])
 
 bc (Fix _ _ _ _ _ e) = bc e >>= (\ce -> return ([FUNCTION, length ce + 1]++ce++[RETURN, FIX]))
 
@@ -147,6 +157,10 @@ runBVM (CALL:c) e (v:(Fun ef cf):s) = runBVM cf (v:ef) ((RA e c):s)
 runBVM (SUCC:c) e ((I n):s) = runBVM c e ((I (n+1)):s)
 
 runBVM (PRED:c) e ((I n):s) = runBVM c e ((I $ max 0 (n-1)):s)
+
+runBVM (SUM:c) e ((I n2):(I n1):s) = runBVM c e ((I (n1+n2)):s)
+
+runBVM (SUB:c) e ((I n2):(I n1):s) = runBVM c e ((I (n1-n2)):s)
 
 runBVM (IFZ:lct1:c) e ((I ve):s) = if ve == 0
                                      then runBVM c e s

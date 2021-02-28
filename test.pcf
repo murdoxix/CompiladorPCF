@@ -12,3 +12,5 @@ let rec suma (m n:Nat) : Nat =
 
 let rec resta (m n:Nat) : Nat =
   ifz n then m else pred (resta m (pred n))
+
+let main:Nat = (-5) 7

@@ -15,6 +15,7 @@ module Elab ( elab, elab_decl, desugar ) where
 import Lang
 import Subst
 import MonadPCF ( MonadPCF, failPosPCF, addTy, lookupTy )
+import Common ( Pos (NoPos) )
 
 desugar_type :: MonadPCF m => STy -> m Ty
 desugar_type SNatTy =
@@ -77,13 +78,29 @@ desugar (SApp p (SUnaryOp p' o) t) =
   do td <- desugar t
      return (UnaryOp p o td)
 
+desugar (SApp p (SApp _ t (SBinaryOp _ b)) t') =
+  do td  <- desugar t
+     t'd <- desugar t'
+     return (BinaryOp p b td t'd)
+
+desugar (SApp p (SBinaryOp _ b) t) =
+  do td  <- desugar t
+     return (Lam p "x" NatTy (BinaryOp p b (V NoPos "x") td))
+
+desugar (SApp p t (SBinaryOp _ b)) =
+  do td  <- desugar t
+     return (Lam p "x" NatTy (BinaryOp p b td (V NoPos "x")))
+
 desugar (SApp p t t') =
   do td  <- desugar t
      t'd <- desugar t'
      return (App p td t'd)
 
 desugar (SUnaryOp p o) =
-  return (Lam p "x" NatTy (UnaryOp p o (V p "x")))
+  return (Lam p "x" NatTy (UnaryOp p o (V NoPos "x")))
+
+desugar (SBinaryOp p o) =
+  return (Lam p "x" NatTy (Lam p "y" NatTy (BinaryOp p o (V NoPos "x") (V NoPos "y"))))
 
 desugar (SFix p f fty x xty t) =
   do ftyd <- desugar_type fty
@@ -116,6 +133,7 @@ elab stm = do desugared <- desugar stm
     elab' (Fix p f fty x xty t) = Fix p f fty x xty (closeN [f, x] (elab' t))
     elab' (IfZ p c t e)         = IfZ p (elab' c) (elab' t) (elab' e)
     elab' (UnaryOp p o t)       = UnaryOp p o (elab' t)
+    elab' (BinaryOp p o h a)    = BinaryOp p o (elab' h) (elab' a)
     elab' (Let p v ty t e)      = Let p v ty (elab' t) (close v (elab' e))
 
 desugar_decl :: MonadPCF m => SDecl STerm -> m (Maybe (Decl STerm))
