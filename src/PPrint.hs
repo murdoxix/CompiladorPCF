@@ -49,7 +49,6 @@ openAll (Fix p f fty x xty t) =
     let ([f', x'], t') = openRename [f, x] t in
     Fix p f' fty x' xty (openAll t')
 openAll (IfZ p c t e) = IfZ p (openAll c) (openAll t) (openAll e)
-openAll (UnaryOp p o t) = UnaryOp p o (openAll t)
 openAll (BinaryOp p o t u) = BinaryOp p o (openAll t) (openAll u)
 openAll (Let p v ty t e) = 
     let ([v'], e') = openRename [v] e in
@@ -76,10 +75,6 @@ ppTy = render . ty2doc
 
 c2doc :: Const -> Doc
 c2doc (CNat n) = text (show n)
-
-unary2doc :: UnaryOp -> Doc
-unary2doc Succ = text "succ"
-unary2doc Pred = text "pred"
 
 binary2doc :: BinaryOp -> Doc
 binary2doc Sum = text "+"
@@ -125,10 +120,6 @@ t2doc at (IfZ _ c t e) =
       , text "then", nest 2 (t2doc False t)
       , text "else", nest 2 (t2doc False e) ]
 
-t2doc at (UnaryOp _ o t) =
-  parenIf at $
-  unary2doc o <+> t2doc True t
-
 t2doc at (BinaryOp _ o t h) =
   parenIf at $
   t2doc True t <+> binary2doc o <+> t2doc True h
@@ -146,5 +137,3 @@ pp :: Term -> String
 -- Uncomment to use the Show instance for Term
 {- pp = show -}
 pp = render . t2doc False . openAll
-
-

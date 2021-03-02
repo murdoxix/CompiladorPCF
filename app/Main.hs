@@ -31,8 +31,8 @@ import Lang
 import Parse ( P, tm, program, declOrTm, runP )
 import Elab ( elab, elab_decl, desugar )
 import Bytecompile ( bytecompileModule, bcWrite, runBC, bcRead )
-import CEK ( exec )
--- ~ import Eval ( eval )
+-- ~ import CEK ( exec )
+import Eval ( eval )
 import PPrint ( pp , ppTy )
 import MonadPCF
 import TypeChecker ( tc, tcDecl )
@@ -150,7 +150,7 @@ handleDecl d = do
           Nothing -> return ()
           Just de@(Decl p x ty t) ->
             do tcDecl de
-               te <- exec t
+               te <- eval t
                addDecl (Decl p x ty te)
                return ()
 
@@ -239,7 +239,7 @@ handleTerm t = do
          tt <- elab t
          s <- get
          ty <- tc tt (tyEnv s)
-         te <- exec tt
+         te <- eval tt
          printPCF (pp te ++ " : " ++ ppTy ty)
 
 printPhrase   :: MonadPCF m => String -> m ()

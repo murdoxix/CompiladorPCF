@@ -95,7 +95,6 @@ data Tm info var =
   | Const info Const
   | Lam info Name Ty (Tm info var)
   | App info (Tm info var) (Tm info var)
-  | UnaryOp info UnaryOp (Tm info var)
   | BinaryOp info BinaryOp (Tm info var) (Tm info var)
   | Fix info Name Ty Name Ty (Tm info var)
   | IfZ info (Tm info var) (Tm info var) (Tm info var)
@@ -118,7 +117,6 @@ getInfo (V i _)            = i
 getInfo (Const i _)        = i
 getInfo (Lam i _ _ _)      = i
 getInfo (App i _ _ )       = i
-getInfo (UnaryOp i _ _)    = i
 getInfo (BinaryOp i _ _ _) = i
 getInfo (Fix i _ _ _ _ _)  = i
 getInfo (IfZ i _ _ _)      = i
@@ -130,7 +128,6 @@ freeVars (V _ (Free v))       = [v]
 freeVars (V _ _)              = []
 freeVars (Lam _ _ _ t)        = freeVars t
 freeVars (App _ l r)          = freeVars l ++ freeVars r
-freeVars (UnaryOp _ _ t)      = freeVars t
 freeVars (BinaryOp _ _ e1 e2) = freeVars e1 ++ freeVars e2
 freeVars (Fix _ _ _ _ _ t)    = freeVars t
 freeVars (IfZ _ c t e)        = freeVars c ++ freeVars t ++ freeVars e

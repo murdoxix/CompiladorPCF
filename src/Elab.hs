@@ -74,9 +74,13 @@ desugar (SLam p ((x1, ty1):l) t) =
      t'   <- desugar $ SLam p l t
      return (Lam p x1 ty1d t')
 
-desugar (SApp p (SUnaryOp p' o) t) =
+desugar (SApp p (SUnaryOp p' Succ) t) =
   do td <- desugar t
-     return (UnaryOp p o td)
+     return (BinaryOp p Sum td (Const NoPos (CNat 1)))
+
+desugar (SApp p (SUnaryOp p' Pred) t) =
+  do td <- desugar t
+     return (BinaryOp p Sub td (Const NoPos (CNat 1)))
 
 desugar (SApp p (SApp _ t (SBinaryOp _ b)) t') =
   do td  <- desugar t
@@ -96,8 +100,11 @@ desugar (SApp p t t') =
      t'd <- desugar t'
      return (App p td t'd)
 
-desugar (SUnaryOp p o) =
-  return (Lam p "x" NatTy (UnaryOp p o (V NoPos "x")))
+desugar (SUnaryOp p Succ) =
+  return (Lam p "x" NatTy (BinaryOp p Sum (V NoPos "x") (Const NoPos (CNat 1))))
+
+desugar (SUnaryOp p Pred) =
+  return (Lam p "x" NatTy (BinaryOp p Sub (V NoPos "x") (Const NoPos (CNat 1))))
 
 desugar (SBinaryOp p o) =
   return (Lam p "x" NatTy (Lam p "y" NatTy (BinaryOp p o (V NoPos "x") (V NoPos "y"))))
@@ -132,7 +139,6 @@ elab stm = do desugared <- desugar stm
     elab' (App p h a)           = App p (elab' h) (elab' a)
     elab' (Fix p f fty x xty t) = Fix p f fty x xty (closeN [f, x] (elab' t))
     elab' (IfZ p c t e)         = IfZ p (elab' c) (elab' t) (elab' e)
-    elab' (UnaryOp p o t)       = UnaryOp p o (elab' t)
     elab' (BinaryOp p o h a)    = BinaryOp p o (elab' h) (elab' a)
     elab' (Let p v ty t e)      = Let p v ty (elab' t) (close v (elab' e))
 

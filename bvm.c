@@ -49,8 +49,6 @@
 #define ACCESS   3
 #define FUNCTION 4
 #define CALL     5
-#define SUCC     6
-#define PRED     7
 #define IFZ      8
 #define FIX      9
 #define STOP     10
@@ -225,19 +223,6 @@ void run(code init_c)
 		case CONST: {
 			/* Una constante: la leemos y la ponemos en la stack */
 			(*s++).i = *c++;
-			break;
-		}
-
-		case SUCC: {
-			/* Sucesor: ya tenemos el resultado del argumento
-			 * en la stack, le sumamos uno. */
-			s[-1].i++;
-			break;
-		}
-
-		case PRED: {
-			if (s[-1].i > 0)
-				s[-1].i--;
 			break;
 		}
 

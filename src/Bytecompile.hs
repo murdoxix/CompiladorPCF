@@ -69,8 +69,6 @@ pattern CONST    = 2
 pattern ACCESS   = 3
 pattern FUNCTION = 4
 pattern CALL     = 5
-pattern SUCC     = 6
-pattern PRED     = 7
 pattern IFZ      = 8
 pattern FIX      = 9
 pattern STOP     = 10
@@ -93,10 +91,6 @@ bc (Lam _ _ _ t) = bc t >>= (\ct -> return ([FUNCTION, length ct + 1]++ct++[RETU
 bc (App _ f e) = do cf <- bc f
                     ce <- bc e
                     return (cf++ce++[CALL])
-
-bc (UnaryOp _ Succ e) = bc e >>= (\ce -> return (ce++[SUCC]))
-
-bc (UnaryOp _ Pred e) = bc e >>= (\ce -> return (ce++[PRED]))
 
 bc (BinaryOp _ Sum t1 t2) = do ct1 <- bc t1
                                ct2 <- bc t2 
@@ -153,10 +147,6 @@ runBVM (ACCESS:i:c) e s = runBVM c e (e!!i:s)
 runBVM (FUNCTION:l:cfYc) e s = runBVM (drop l cfYc) e ((Fun e cfYc):s)
 
 runBVM (CALL:c) e (v:(Fun ef cf):s) = runBVM cf (v:ef) ((RA e c):s)
-
-runBVM (SUCC:c) e ((I n):s) = runBVM c e ((I (n+1)):s)
-
-runBVM (PRED:c) e ((I n):s) = runBVM c e ((I $ max 0 (n-1)):s)
 
 runBVM (SUM:c) e ((I n2):(I n1):s) = runBVM c e ((I (n1+n2)):s)
 

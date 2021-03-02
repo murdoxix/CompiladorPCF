@@ -22,8 +22,8 @@ exec t = (search t [] []) >>= valToTerm
 
 -- Fase de búsqueda
 search  :: MonadPCF m => Term -> Env -> Kont -> m Val
-search (UnaryOp _ o t) p k =
-  search t p (KUnaryOp o : k)
+-- ~ search (UnaryOp _ o t) p k =
+  -- ~ search t p (KUnaryOp o : k)
 
 search (IfZ _ c t e) p k =
   search c p (KIfZ p t e : k)
