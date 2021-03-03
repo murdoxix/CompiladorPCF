@@ -69,6 +69,7 @@ pattern CONST    = 2
 pattern ACCESS   = 3
 pattern FUNCTION = 4
 pattern CALL     = 5
+pattern TAILCALL = 6
 pattern IFZ      = 8
 pattern FIX      = 9
 pattern STOP     = 10
@@ -86,7 +87,7 @@ bc (V _ (Free v)) = failPCF $ "Error de compilación. Está la variable " ++ v +
 
 bc (Const _ (CNat n)) = return [CONST, n]
 
-bc (Lam _ _ _ t) = bc t >>= (\ct -> return ([FUNCTION, length ct + 1]++ct++[RETURN]))
+bc (Lam _ _ _ t) = bt t >>= (\tt -> return ([FUNCTION, length tt]++tt))
 
 bc (App _ f e) = do cf <- bc f
                     ce <- bc e
@@ -110,6 +111,21 @@ bc (IfZ _ e t1 t2) = do ce <- bc e
 bc (Let _ _ _ e1 e2) = do ce1 <- bc e1
                           ce2 <- bc e2
                           return (ce1++[SHIFT]++ce2++[DROP])
+
+bt :: MonadPCF m => Term -> m Bytecode
+bt (App _ f e) = do cf <- bc f
+                    ce <- bc e
+                    return (cf++ce++[TAILCALL])
+bt (IfZ _ e t1 t2) = do ce <- bc e
+                        tt1 <- bt t1
+                        tt2 <- bt t2
+                        return (ce++[IFZ,length tt1 + 2]++tt1++[JUMP,length tt2]++tt2)
+
+bt (Let _ _ _ e1 e2) = do ce1 <- bc e1
+                          te2 <- bt e2
+                          return (ce1++[SHIFT]++te2)
+
+bt t = bc t >>= (\ct -> return (ct++[RETURN]))
 
 bytecompileModule :: MonadPCF m => Module -> m Bytecode
 bytecompileModule mod = translate mod >>= bc >>= (\cmod -> return $ cmod ++ [PRINT, STOP])
@@ -147,6 +163,8 @@ runBVM (ACCESS:i:c) e s = runBVM c e (e!!i:s)
 runBVM (FUNCTION:l:cfYc) e s = runBVM (drop l cfYc) e ((Fun e cfYc):s)
 
 runBVM (CALL:c) e (v:(Fun ef cf):s) = runBVM cf (v:ef) ((RA e c):s)
+
+runBVM (TAILCALL:c) e (v:(Fun ef cf):s) = runBVM cf (v:ef) s
 
 runBVM (SUM:c) e ((I n2):(I n1):s) = runBVM c e ((I (n1+n2)):s)
 

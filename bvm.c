@@ -10,7 +10,7 @@
 #include <inttypes.h>
 #include <unistd.h>
 
-#define FAST 1
+#define FAST 0
 #define TRACE 0
 
 #define quit(...)							\
@@ -49,6 +49,7 @@
 #define ACCESS   3
 #define FUNCTION 4
 #define CALL     5
+#define TAILCALL 6
 #define IFZ      8
 #define FIX      9
 #define STOP     10
@@ -273,6 +274,26 @@ void run(code init_c)
 
 			struct clo ret_addr = { .clo_env = e, .clo_body = c };
 			(*s++).clo = ret_addr;
+
+			/* Cambiamos al entorno de la clausura, agregando arg */
+			e = env_push(fun.clo.clo_env, arg);
+
+			/* Saltamos! */
+			c = fun.clo.clo_body;
+
+			break;
+		}
+
+		case TAILCALL: {
+			/* Aplicación en posición de cola: tenemos en la stack
+       * un argumento y una función. La función debe ser una
+       * clausura. La idea es saltar a la clausura extendiendo su
+			 * entorno con el valor de la aplicación, pero, a diferencia
+       * de la aplicación normal, no tenemos que guardar nuestra
+       * dirección de retorno.
+			 */
+			value arg = *--s;
+			value fun = *--s;
 
 			/* Cambiamos al entorno de la clausura, agregando arg */
 			e = env_push(fun.clo.clo_env, arg);
