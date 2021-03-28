@@ -21,13 +21,14 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Data.List ( isPrefixOf )
 
+produceid :: CCState Int
 produceid = do id <- get
                put (id+1)
                return id
 
-type CCState = StateT Int (Writer [IrDecl]) Ir
+type CCState a = StateT Int (Writer [IrDecl]) a
 
-closureConvert :: Term -> CCState
+closureConvert :: Term -> CCState Ir
 closureConvert (V _ (Free v)) = return (IrVar v)
 
 closureConvert (Const _ n) = return (IrConst n)
@@ -56,7 +57,7 @@ closureConvert (Fix _ n _ x _ e) = closureConvertFun [n,x] e
 -- closureConvertFun abstrae las similaridades de CC de las funciones,
 -- es decir, las Lam y Fix. Si vars tiene un elemento es el caso Lam,
 -- si tiene dos elementos es un Fix. No hay otro caso.
-closureConvertFun :: [Name] -> Term -> CCState
+closureConvertFun :: [Name] -> Term -> CCState Ir
 closureConvertFun vars e = do idfun <- produceid
                               idvars <- mapM (\_ -> produceid) vars
                               let vars' = map (\(v,id) -> "__"++v++show id) (zip vars idvars)
