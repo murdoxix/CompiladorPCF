@@ -156,3 +156,23 @@ data Frame =
   deriving Show
 
 type Kont = [Frame]
+
+data Ir =
+    IrVar Name
+  | IrCall Ir [Ir]
+  | IrConst Const
+  | IrBinaryOp BinaryOp Ir Ir
+  | IrLet Name Ir Ir
+  | IrIfZ Ir Ir Ir
+  | MkClosure Name [Ir]
+  | IrAccess Ir Int
+  deriving Show
+
+data IrDecl =
+    IrVal { irDeclName :: Name,
+            irDeclDef  :: Ir }
+  | IrFun { irDeclName     :: Name,
+            irDeclArity    :: Int,
+            irDeclArgNames :: [Name],
+            irDeclBody     :: Ir }
+  deriving Show

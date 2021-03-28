@@ -31,11 +31,11 @@ import Lang
 import Parse ( P, tm, program, declOrTm, runP )
 import Elab ( elab, elab_decl, desugar )
 import Bytecompile ( bytecompileModule, bcWrite, runBC, bcRead )
--- ~ import CEK ( exec )
 import Eval ( eval )
 import PPrint ( pp , ppTy )
 import MonadPCF
 import TypeChecker ( tc, tcDecl )
+import ClosureConversion ( runCC )
 
 prompt :: String
 prompt = "PCF> "
@@ -58,14 +58,20 @@ main = execParser opts >>= go
            let lastFile = last files
                fileByte = ((++ "byte") . take (length lastFile - 3)) lastFile
            liftIO $ bcWrite bytecode fileByte )
-    go (Run,files) = void $ runPCF $ catchErrors
+    go (Run, files) = void $ runPCF $ catchErrors
       ( do asBytecodes <- liftIO $ mapM bcRead files
            mapM_ runBC asBytecodes )
+    go (ClosureConversion, files) = void $ runPCF $ catchErrors $
+      ( do mods <- verifyFiles files
+           let mod = foldl (++) [] mods
+           printPCF "Resultado de CC:"
+           mapM_ (printPCF . show) (runCC mod) )
 
 data Mode = Interactive
           | Typecheck
           | Bytecompile
           | Run
+          | ClosureConversion
 
 -- | Parser de banderas
 parseMode :: Parser Mode
@@ -73,6 +79,7 @@ parseMode =
       flag' Typecheck ( long "typecheck" <> short 't' <> help "Solo chequear tipos")
   <|> flag' Bytecompile (long "bytecompile" <> short 'c' <> help "Compilar a la BVM")
   <|> flag' Run (long "run" <> short 'r' <> help "Ejecutar bytecode en la BVM")
+  <|> flag' ClosureConversion (long "cc" <> help "Imprime el resultado de hacer conversión de clausuras y hoisting")
   <|> flag Interactive Interactive ( long "interactive" <> short 'i'<> help "Ejecutar en forma interactiva" )
 
 -- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar

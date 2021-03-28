@@ -15,6 +15,7 @@ import Lang
 import Common
 import Text.Parsec hiding (runP)
 import Data.Char ( isNumber, ord, isUpper )
+import Data.List ( isPrefixOf )
 import qualified Text.Parsec.Token as Tok
 import Text.ParserCombinators.Parsec.Language ( GenLanguageDef(..), emptyDef )
 
@@ -60,7 +61,10 @@ num :: P Int
 num = fromInteger <$> natural
 
 var :: P Name
-var = identifier
+var = do i <- identifier
+         if "__" `isPrefixOf` i
+           then unexpected "Las variables no pueden tener __ como prefijo."
+           else return i
 
 getPos :: P Pos
 getPos = do pos <- getPosition
@@ -71,7 +75,7 @@ tyvar = Tok.lexeme lexer $ do
   n <- identifier
   if isUpper $ head n
     then return n
-    else unexpected "Los sinónimos de tipos deben empezar con mayuscula"
+    else unexpected "Los sinónimos de tipos deben empezar con letra mayuscula"
 
 tyatom :: P STy
 tyatom = (reserved "Nat" >> return SNatTy)
