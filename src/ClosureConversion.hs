@@ -21,10 +21,10 @@ import Control.Monad.State
 import Control.Monad.Writer
 import Data.List ( isPrefixOf )
 
-produceid :: CCState Int
+produceid :: CCState Name
 produceid = do id <- get
                put (id+1)
-               return id
+               return (show id)
 
 type CCState a = StateT Int (Writer [IrDecl]) a
 
@@ -60,7 +60,7 @@ closureConvert (Fix _ n _ x _ e) = closureConvertFun [n,x] e
 closureConvertFun :: [Name] -> Term -> CCState Ir
 closureConvertFun vars e = do idfun <- produceid
                               idvars <- mapM (\_ -> produceid) vars
-                              let vars' = map (\(v,id) -> "__"++v++show id) (zip vars idvars)
+                              let vars' = map (\(v,id) -> "__"++v++id) (zip vars idvars)
                                   opene = openN vars' e
                               ire <- closureConvert opene
                               idclo <- produceid
@@ -69,8 +69,8 @@ closureConvertFun vars e = do idfun <- produceid
                                     case length vars of
                                       1 -> zip3 freeVarse [1..] (cycle [cloName])
                                       2 -> zip3 (freeVarse++[vars'!!0]) [1..] (cycle [cloName])
-                                  cloName = "__clo"++show idclo
-                                  irfunName = "__"++show idfun
+                                  cloName = "__clo"++idclo
+                                  irfunName = "__"++idfun
                                   irfunArgNames = [cloName, last vars']
                                   irfunBody = foldl aux ire indexedFreeVars
                                   irfun = IrFun { irDeclName = irfunName,
@@ -82,10 +82,12 @@ closureConvertFun vars e = do idfun <- produceid
                               return clo
   where aux e (x, n, cloName) = IrLet x (IrAccess (IrVar cloName) n) e
 
+-- freeNestedVars devuelve las variables libres en un término generadas
+-- por nosotros, es decir, las que tienen __ como prefijo.
 freeNestedVars :: Term -> [Name]
 freeNestedVars t = filter ("__" `isPrefixOf`) (freeVars t)
 
-runCC :: Module -> [IrDecl]
+runCC :: Module -> IrDecls
 runCC mod = runCC' mod [] 0
   where runCC' [] acc _ = acc
         runCC' (x:xs) acc id =
