@@ -8,9 +8,19 @@ let rec ack (m:Nat) (n:Nat) : Nat =
     else ack (pred m) (ack m (pred n)))
 
 let rec suma (m n:Nat) : Nat = 
-  ifz n then m else succ (suma m (pred n))
+  ifz n then m else suma (succ m) (pred n)
 
 let rec resta (m n:Nat) : Nat =
-  ifz n then m else pred (resta m (pred n))
+  ifz n then m else resta (pred m) (pred n)
 
-let main:Nat = (-5) 7
+let add : Nat -> (Nat -> Nat) =
+  fun (x:Nat) ->
+    let f : Nat -> Nat = fun (y:Nat) -> x + y in
+    f
+
+let add5 : Nat -> Nat = add 5
+
+let quince : Nat = print (print (add5 10))
+
+let main:Nat = 15*15
+

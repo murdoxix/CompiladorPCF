@@ -31,6 +31,7 @@ varChanger local bound t = go 0 t where
   go n t@(Const _ _)         = t
   go n (BinaryOp p op l r)   = BinaryOp p op (go n l) (go n r)
   go n (Let p v ty t e)      = Let p v ty (go n t) (go (n+1) e)
+  go n (Print p t)           = Print p (go n t)
 
 -- `openN [nn,..,n0] t` reemplaza las primeras (n+1) variables ligadas
 -- en `t` (que debe ser localmente cerrado) por los nombres libres en la

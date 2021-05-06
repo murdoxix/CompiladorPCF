@@ -15,7 +15,6 @@ module Main where
 import System.Console.Haskeline ( defaultSettings, getInputLine, runInputT, InputT )
 import Control.Monad.Catch (MonadMask)
 
---import Control.Monad
 import Control.Monad.Trans
 import Data.List (nub,  intersperse, isPrefixOf )
 import Data.Char ( isSpace )
@@ -27,7 +26,7 @@ import Options.Applicative
 
 import Global ( GlEnv(..) )
 import Errors
-import Lang
+import Lang hiding ( Print )
 import Parse ( P, tm, program, declOrTm, runP )
 import Elab ( elab, elab_decl, desugar )
 import Bytecompile ( bytecompileModule, bcWrite, runBC, bcRead )
@@ -52,9 +51,8 @@ main = execParser opts >>= go
     go (Interactive,files) = void $ runPCF $ catchErrors $ runInputT defaultSettings (repl files)
     go (Typecheck, files) = void $ runPCF $ catchErrors $ verifyFiles files
     go (Bytecompile, files) = void $ runPCF $ catchErrors $
-      ( do asModules <- verifyFiles files
-           let oneModule = foldl (++) [] asModules
-           bytecode <- bytecompileModule oneModule
+      ( do modul <- verifyMod files
+           bytecode <- bytecompileModule modul
            let lastFile = last files
                fileByte = ((++ "byte") . take (length lastFile - 3)) lastFile
            liftIO $ bcWrite bytecode fileByte )
@@ -62,10 +60,9 @@ main = execParser opts >>= go
       ( do asBytecodes <- liftIO $ mapM bcRead files
            mapM_ runBC asBytecodes )
     go (ClosureConversion, files) = void $ runPCF $ catchErrors $
-      ( do mods <- verifyFiles files
-           let mod = foldl (++) [] mods
+      ( do modul <- verifyMod files
            printPCF "Resultado de CC:"
-           mapM_ (printPCF . show) (runCC mod) )
+           mapM_ (printPCF . show) (runCC modul) )
 
 data Mode = Interactive
           | Typecheck
@@ -104,7 +101,19 @@ repl args = do
                        b <- lift $ catchErrors $ handleCommand c
                        maybe loop (flip when loop) b
 
-verifyFiles ::  MonadPCF m => [String] -> m [Module]
+-- Toma una lista de archivos con código fuente y devuelve un único Module.
+-- Chequea que haya al menos un archivo y que la última declaración sea
+-- de tipo Nat.
+verifyMod :: MonadPCF m => [String] -> m Module
+verifyMod []    = failPCF "Error de compilación de módulo. Debe haber al menos una declaración."
+verifyMod files = do mods <- verifyFiles files
+                     let modul = foldl (++) [] mods
+                         isNatTheLast = (declType (last modul)) == NatTy
+                     if isNatTheLast
+                       then return modul
+                       else failPCF "Error de compilación de módulo. La última declaración debe ser de tipo Nat."
+
+verifyFiles :: MonadPCF m => [String] -> m [Module]
 verifyFiles [] = return []
 verifyFiles (x:xs) = do
         modify (\s -> s { lfile = x, inter = False })

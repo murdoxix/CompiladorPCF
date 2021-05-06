@@ -82,6 +82,10 @@ desugar (SApp p (SUnaryOp p' Pred) t) =
   do td <- desugar t
      return (BinaryOp p Sub td (Const NoPos (CNat 1)))
 
+desugar (SApp p (SUnaryOp p' UPrint) t) =
+  do td <- desugar t
+     return (Print p td)
+
 desugar (SApp p (SApp _ t (SBinaryOp _ b)) t') =
   do td  <- desugar t
      t'd <- desugar t'
@@ -105,6 +109,9 @@ desugar (SUnaryOp p Succ) =
 
 desugar (SUnaryOp p Pred) =
   return (Lam p "x" NatTy (BinaryOp p Sub (V NoPos "x") (Const NoPos (CNat 1))))
+
+desugar (SUnaryOp p UPrint) =
+  return (Lam p "x" NatTy (Print p (V NoPos "x")))
 
 desugar (SBinaryOp p o) =
   return (Lam p "x" NatTy (Lam p "y" NatTy (BinaryOp p o (V NoPos "x") (V NoPos "y"))))
@@ -141,6 +148,7 @@ elab stm = do desugared <- desugar stm
     elab' (IfZ p c t e)         = IfZ p (elab' c) (elab' t) (elab' e)
     elab' (BinaryOp p o h a)    = BinaryOp p o (elab' h) (elab' a)
     elab' (Let p v ty t e)      = Let p v ty (elab' t) (close v (elab' e))
+    elab' (Print p h)           = Print p (elab' h)
 
 desugar_decl :: MonadPCF m => SDecl STerm -> m (Maybe (Decl STerm))
 desugar_decl (SSynonymDecl p n ty) =

@@ -53,6 +53,7 @@ openAll (BinaryOp p o t u) = BinaryOp p o (openAll t) (openAll u)
 openAll (Let p v ty t e) = 
     let ([v'], e') = openRename [v] e in
     Let p v' ty  (openAll t) (openAll e')
+openAll (Print p t) = Print p (openAll t)
 
 -- | Pretty printer de nombres (Doc)
 name2doc :: Name -> Doc
@@ -77,8 +78,9 @@ c2doc :: Const -> Doc
 c2doc (CNat n) = text (show n)
 
 binary2doc :: BinaryOp -> Doc
-binary2doc Sum = text "+"
-binary2doc Sub = text "-"
+binary2doc Sum  = text "+"
+binary2doc Sub  = text "-"
+binary2doc Prod = text "*"
 
 collectApp :: NTerm -> (NTerm, [NTerm])
 collectApp t = go [] t where
@@ -127,6 +129,10 @@ t2doc at (BinaryOp _ o t h) =
 t2doc at (Let _ v ty t e) =
   parenIf at $
   sep [ text "let",name2doc v,text ":",ty2doc ty,text "=",t2doc False t,text "in",t2doc False e]
+
+t2doc at (Print _ t) =
+  parenIf at $
+  text "print" <+> t2doc True t
 
 binding2doc :: (Name, Ty) -> Doc
 binding2doc (x, ty) =
