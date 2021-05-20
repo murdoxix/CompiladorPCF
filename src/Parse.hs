@@ -31,7 +31,7 @@ lexer = Tok.makeTokenParser $
          commentLine    = "#",
          reservedNames = ["let", "fun", "fix", "then", "else",
                           "succ", "pred", "ifz", "Nat", "in",
-                          "rec", "type", "print"],
+                          "rec", "type", "print", "pcfmain"],
          reservedOpNames = ["->", ":", "=", "+", "-", "*"]
         }
 

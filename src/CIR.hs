@@ -64,27 +64,63 @@ instance Show CanonProg where
     pr1 (Right v) =
       "declare " ++ v ++ "\n\n"
 
-type CanonMonad = StateT (Int, Loc, [Inst]) (Writer Blocks) ()
+type CanonMonad = StateT (Int, Loc, [Inst]) (Writer Blocks)
 
 -- ~ type CanonFun = (String, [String], Blocks)
 -- ~ type CanonVal = String -- Sólo el nombre, tipo puntero siempre
 -- ~ newtype CanonProg = CanonProg [Either CanonFun CanonVal]
 
 runCanon :: IrDecls -> CanonProg
-runCanon decls = CanonProg canon_funs ++ canon_vals ++ [pcfmain]
-    where isfun (IrFun{}) = True
-          isfun _         = False
-          isval (IrVal{}) = True
-          isval _         = False
-          canon_funs = runCanon' $ filter isfun decls
-          canon_vals = filter isval decls
-          pcfmain = Left $ makepcfmain canon_vals 
+runCanon decls = CanonProg $ canon_funs ++ canon_vals ++ [pcfmain]
+    where isfun = \d -> case d of {IrFun{} -> True; _ -> False}
+          funs = filter isfun decls
+          vals = filter (not . isfun) decls
+          start_state = (0, "", [])
 
--- ~ data IrDecl =
-    -- ~ IrVal { irDeclName :: Name,
-            -- ~ irDeclDef  :: Ir }
-  -- ~ | IrFun { irDeclName     :: Name,
-            -- ~ irDeclArity    :: Int,
-            -- ~ irDeclArgNames :: [Name],
-            -- ~ irDeclBody     :: Ir }
+          makeFuns = foldr f (start_state, []) funs
+              where f (IrFun funName _ funArgs funBody) (state, canonfuns) =
+                        let monad = do startBlock funName
+                                       v <- irToCanon funBody
+                                       finishBlock $ Return v
+                            (state', newblocks) = runWriter $ execStateT monad state
+                        in (state', (Left (funName, funArgs, newblocks)):canonfuns)
+          canon_funs = snd makeFuns
+
+          canon_vals = map (Right . irDeclName) vals
+
+          pcfmain = let pcfmainblocks = execWriter $ runStateT (makepcfmain vals) $ fst makeFuns
+                    in Left ("pcfmain", [], pcfmainblocks)
+
+makepcfmain :: IrDecls -> CanonMonad ()
+makepcfmain vals = do startBlock "pcfmain"
+                      v <- f vals
+                      finishBlock $ Return v
+    where f ((IrVal valName valDef):xs) = do
+                      val <- irToCanon valDef
+                      addInst $ Store valName (V val)
+                      if null xs then return val else f xs
+
+irToCanon :: Ir -> CanonMonad Val
+irToCanon (IrVar v) = undefined
+
+
+-- ~ data Ir =
+    -- ~ IrVar Name
+  -- ~ | IrCall Ir [Ir]
+  -- ~ | IrConst Const
+  -- ~ | IrBinaryOp BinaryOp Ir Ir
+  -- ~ | IrLet Name Ir Ir
+  -- ~ | IrIfZ Ir Ir Ir
+  -- ~ | MkClosure Name [Ir]
+  -- ~ | IrAccess Ir Int
   -- ~ deriving Show
+
+startBlock :: Loc -> CanonMonad ()
+startBlock loc = modify $ \(n,_,_) -> (n,loc,[])
+
+finishBlock :: Terminator -> CanonMonad ()
+finishBlock term = do (n,l,i) <- get
+                      tell [(l, reverse i, term)]
+
+addInst :: Inst -> CanonMonad ()
+addInst inst = modify $ \(n,l,i) -> (n,l,inst:i)
