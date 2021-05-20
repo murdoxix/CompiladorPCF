@@ -101,7 +101,11 @@ makepcfmain vals = do startBlock "pcfmain"
                       if null xs then return val else f xs
 
 irToCanon :: Ir -> CanonMonad Val
-irToCanon (IrVar v) = undefined
+irToCanon (IrVar v) = if "__" `isPrefixOf` v
+                      then return $ R $ Temp v
+                      else return $ G v
+
+irToCanon (IrCall v) = 
 
 
 -- ~ data Ir =
@@ -113,6 +117,33 @@ irToCanon (IrVar v) = undefined
   -- ~ | IrIfZ Ir Ir Ir
   -- ~ | MkClosure Name [Ir]
   -- ~ | IrAccess Ir Int
+  -- ~ deriving Show
+
+-- ~ newtype Reg = Temp String
+  -- ~ deriving Show
+
+-- ~ data Val = R Reg | C Int | G Name
+  -- ~ deriving Show
+  
+-- ~ data Inst =
+    -- ~ Assign Reg Expr
+  -- ~ | Store Name Expr
+  -- ~ deriving Show
+
+-- ~ data Expr =
+    -- ~ BinOp BinaryOp Val Val
+  -- ~ | Phi [(Loc, Val)]
+  -- ~ | Call Val [Val]
+  -- ~ | MkClosure Loc [Val]
+  -- ~ | V Val
+  -- ~ | Access Val Int
+  -- ~ | Print Val
+  -- ~ deriving Show
+
+-- ~ data Terminator =
+    -- ~ Jump Loc
+  -- ~ | CondJump Cond Loc Loc
+  -- ~ | Return Val
   -- ~ deriving Show
 
 startBlock :: Loc -> CanonMonad ()
