@@ -66,10 +66,6 @@ instance Show CanonProg where
 
 type CanonMonad = StateT (Int, Loc, [Inst]) (Writer Blocks)
 
--- ~ type CanonFun = (String, [String], Blocks)
--- ~ type CanonVal = String -- Sólo el nombre, tipo puntero siempre
--- ~ newtype CanonProg = CanonProg [Either CanonFun CanonVal]
-
 runCanon :: IrDecls -> CanonProg
 runCanon decls = CanonProg $ canon_funs ++ canon_vals ++ [pcfmain]
     where isfun = \d -> case d of {IrFun{} -> True; _ -> False}
@@ -105,46 +101,53 @@ irToCanon (IrVar v) = if "__" `isPrefixOf` v
                       then return $ R $ Temp v
                       else return $ G v
 
-irToCanon (IrCall v) = 
+irToCanon (IrCall t ts) = do r <- getReg
+                             tcanon <- irToCanon t
+                             tscanon <- mapM irToCanon ts
+                             addInst $ Assign r $ Call tcanon tscanon
+                             return $ R r
 
+irToCanon (IrConst (CNat n)) = return $ C n
 
--- ~ data Ir =
-    -- ~ IrVar Name
-  -- ~ | IrCall Ir [Ir]
-  -- ~ | IrConst Const
-  -- ~ | IrBinaryOp BinaryOp Ir Ir
-  -- ~ | IrLet Name Ir Ir
-  -- ~ | IrIfZ Ir Ir Ir
-  -- ~ | MkClosure Name [Ir]
-  -- ~ | IrAccess Ir Int
-  -- ~ deriving Show
+irToCanon (IrBinaryOp op t e) = do tcanon <- irToCanon t
+                                   ecanon <- irToCanon e
+                                   r <- getReg
+                                   addInst $ Assign r $ BinOp op tcanon ecanon
+                                   return $ R r
 
--- ~ newtype Reg = Temp String
-  -- ~ deriving Show
+irToCanon (IrLet v t e) = do tcanon <- irToCanon t
+                             addInst $ Assign (Temp v) $ V tcanon
+                             irToCanon e
 
--- ~ data Val = R Reg | C Int | G Name
-  -- ~ deriving Show
-  
--- ~ data Inst =
-    -- ~ Assign Reg Expr
-  -- ~ | Store Name Expr
-  -- ~ deriving Show
+irToCanon (IrIfZ c t e) = do thenLoc <- getLoc "then"
+                             elseLoc <- getLoc "else"
+                             ifcontLoc <- getLoc "ifcont"
+                             ccanon <- irToCanon c
+                             finishBlock $ CondJump (Eq ccanon (C 0)) thenLoc elseLoc
 
--- ~ data Expr =
-    -- ~ BinOp BinaryOp Val Val
-  -- ~ | Phi [(Loc, Val)]
-  -- ~ | Call Val [Val]
-  -- ~ | MkClosure Loc [Val]
-  -- ~ | V Val
-  -- ~ | Access Val Int
-  -- ~ | Print Val
-  -- ~ deriving Show
+                             startBlock thenLoc
+                             tcanon <- irToCanon t
+                             finishBlock $ Jump ifcontLoc
 
--- ~ data Terminator =
-    -- ~ Jump Loc
-  -- ~ | CondJump Cond Loc Loc
-  -- ~ | Return Val
-  -- ~ deriving Show
+                             startBlock elseLoc
+                             ecanon <- irToCanon e
+                             finishBlock $ Jump ifcontLoc
+
+                             startBlock ifcontLoc
+                             r <- getReg
+                             addInst $ Assign r $ Phi [(thenLoc, tcanon), (elseLoc, ecanon)]
+
+                             return $ R r
+
+irToCanon (MkClosure v ts) = do tscanon <- mapM irToCanon ts
+                                r <- getReg
+                                addInst $ Assign r $ MkClosure v tscanon
+                                return $ R r
+
+irToCanon (IrAccess t n) = do tcanon <- irToCanon t
+                              r <- getReg
+                              addInst $ Assign r $ Access tcanon n
+                              return $ R r
 
 startBlock :: Loc -> CanonMonad ()
 startBlock loc = modify $ \(n,_,_) -> (n,loc,[])
@@ -155,3 +158,13 @@ finishBlock term = do (n,l,i) <- get
 
 addInst :: Inst -> CanonMonad ()
 addInst inst = modify $ \(n,l,i) -> (n,l,inst:i)
+
+getReg :: CanonMonad Reg
+getReg = do (n,l,i) <- get
+            put (n+1,l,i)
+            return $ Temp $ show n
+
+getLoc :: String -> CanonMonad Reg
+getLoc s = do (n,l,i) <- get
+              put (n+1,l,i)
+              return $ s ++ show n
