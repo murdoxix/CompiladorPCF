@@ -20,7 +20,6 @@ let add : Nat -> (Nat -> Nat) =
 
 let add5 : Nat -> Nat = add 5
 
-let quince : Nat = print (print (add5 10))
+let quince : Nat = print (add5 10)
 
 let main:Nat = 15*15
-

@@ -169,6 +169,7 @@ data Ir =
   | IrIfZ Ir Ir Ir
   | MkClosure Name [Ir]
   | IrAccess Ir Int
+  | IrPrint Ir
   deriving Show
 
 data IrDecl =

@@ -25,13 +25,26 @@ produceid :: CCState Name
 produceid = do id <- get
                put (id+1)
                return (show id)
-
+    -- ~ V info var
+  -- ~ | Const info Const
+  -- ~ | Lam info Name Ty (Tm info var)
+  -- ~ | App info (Tm info var) (Tm info var)
+  -- ~ | BinaryOp info BinaryOp (Tm info var) (Tm info var)
+  -- ~ | Fix info Name Ty Name Ty (Tm info var)
+  -- ~ | IfZ info (Tm info var) (Tm info var) (Tm info var)
+  -- ~ | Let info Name Ty (Tm info var) (Tm info var)
+  -- ~ | Print info (Tm info var)
 type CCState a = StateT Int (Writer [IrDecl]) a
 
 closureConvert :: Term -> CCState Ir
 closureConvert (V _ (Free v)) = return (IrVar v)
 
+closureConvert (V _ (Bound n)) = error "ClosureConversion: no deberia haber variables ligadas acá"
+
 closureConvert (Const _ n) = return (IrConst n)
+
+closureConvert (Print _ t) = do irt <- closureConvert t
+                                return (IrPrint irt)
 
 closureConvert (BinaryOp _ b t e) = do irt <- closureConvert t
                                        ire <- closureConvert e
