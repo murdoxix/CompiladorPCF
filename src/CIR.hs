@@ -129,15 +129,21 @@ irToCanon (IrIfZ c t e) = do thenLoc <- getLoc "then"
 
                              startBlock thenLoc
                              tcanon <- irToCanon t
+                             thenr <- getReg
+                             addInst $ Assign thenr $ V tcanon
+                             thenEndLoc <- getActualLoc
                              finishBlock $ Jump ifcontLoc
 
                              startBlock elseLoc
                              ecanon <- irToCanon e
+                             elser <- getReg
+                             addInst $ Assign elser $ V ecanon
+                             elseEndLoc <- getActualLoc
                              finishBlock $ Jump ifcontLoc
 
                              startBlock ifcontLoc
                              r <- getReg
-                             addInst $ Assign r $ Phi [(thenLoc, tcanon), (elseLoc, ecanon)]
+                             addInst $ Assign r $ Phi [(thenEndLoc, R thenr), (elseEndLoc, R elser)]
 
                              return $ R r
 
@@ -150,6 +156,11 @@ irToCanon (IrAccess t n) = do tcanon <- irToCanon t
                               r <- getReg
                               addInst $ Assign r $ Access tcanon n
                               return $ R r
+
+irToCanon (IrPrint t) = do tcanon <- irToCanon t
+                           r <- getReg
+                           addInst $ Assign r $ CIR.Print tcanon
+                           return $ R r
 
 startBlock :: Loc -> CanonMonad ()
 startBlock loc = modify $ \(n,_,_) -> (n,loc,[])
@@ -170,3 +181,7 @@ getLoc :: String -> CanonMonad Loc
 getLoc s = do (n,l,i) <- get
               put (n+1,l,i)
               return $ s ++ show n
+
+getActualLoc :: CanonMonad Loc
+getActualLoc = do (_,l,_) <- get
+                  return l

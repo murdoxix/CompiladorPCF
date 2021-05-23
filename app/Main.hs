@@ -23,6 +23,10 @@ import Control.Exception ( catch , IOException )
 import System.Environment ( getArgs )
 import System.IO ( stderr, hPutStr )
 import Options.Applicative
+import LLVM.Pretty ( ppllvm )
+import System.Process ( callCommand )
+import Data.Text.IO as TIO ( writeFile )
+import Data.Text.Lazy as TIO ( toStrict )
 
 import Global ( GlEnv(..) )
 import Errors
@@ -35,6 +39,9 @@ import PPrint ( pp , ppTy )
 import MonadPCF
 import TypeChecker ( tc, tcDecl )
 import ClosureConversion ( runCC )
+import CIR ( runCanon )
+import InstSel ( codegen )
+
 
 prompt :: String
 prompt = "PCF> "
@@ -50,7 +57,7 @@ main = execParser opts >>= go
     go :: (Mode,[FilePath]) -> IO ()
     go (Interactive,files) = void $ runPCF $ catchErrors $ runInputT defaultSettings (repl files)
     go (Typecheck, files) = void $ runPCF $ catchErrors $ verifyFiles files
-    go (Bytecompile, files) = void $ runPCF $ catchErrors $
+    go (Bytecompile, files) = void $ runPCF $ catchErrors
       ( do modul <- verifyMod files
            bytecode <- bytecompileModule modul
            let lastFile = last files
@@ -59,11 +66,16 @@ main = execParser opts >>= go
     go (Run, files) = void $ runPCF $ catchErrors
       ( do asBytecodes <- liftIO $ mapM bcRead files
            mapM_ runBC asBytecodes )
-    go (ClosureConversion, files) = void $ runPCF $ catchErrors $
+    go (ClosureConversion, files) = void $ runPCF $ catchErrors
       ( do modul <- verifyMod files
            printPCF "Resultado de CC:"
            mapM_ (printPCF . show) (runCC modul) )
-    go (LLVM, files) = undefined
+    go (LLVM, files) = void $ runPCF $ catchErrors
+      ( do modul <- verifyMod files
+           let llvm = codegen $ runCanon $ runCC modul
+               commandline = "clang -Wno-override-module output.ll runtime.c -lgc -o prog"
+           liftIO $ TIO.writeFile "output.ll" (toStrict (ppllvm llvm))
+           liftIO $ callCommand commandline )
 
 data Mode = Interactive
           | Typecheck
@@ -79,7 +91,7 @@ parseMode =
   <|> flag' Bytecompile (long "bytecompile" <> short 'c' <> help "Compilar a la BVM")
   <|> flag' Run (long "run" <> short 'r' <> help "Ejecutar bytecode en la BVM")
   <|> flag' ClosureConversion (long "cc" <> help "Imprime el resultado de hacer conversión de clausuras y hoisting")
-  <|> flag' LLVM (long "llvm" <> short 'l' <> help "Compila el código a  LLVM y lo ejecuta")
+  <|> flag' LLVM (long "llvm" <> short 'l' <> help "Compila el código a  LLVM y guarda el ejectuable \"prog\"")
   <|> flag Interactive Interactive ( long "interactive" <> short 'i'<> help "Ejecutar en forma interactiva" )
 
 -- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar
