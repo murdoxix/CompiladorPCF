@@ -91,11 +91,6 @@ freeNestedVars :: Term -> [Name]
 freeNestedVars t = filter ("__" `isPrefixOf`) (freeVars t)
 
 runCC :: Module -> IrDecls
-runCC mod = runCC' mod [] 0
-  where runCC' [] acc _ = acc
-        runCC' (x:xs) acc id =
-          let ((ir, id'), decls) = runWriter $ runStateT (closureConvert (declBody x)) id
-              xdecl = IrVal { irDeclName = declName x,
-                              irDeclDef = ir }
-              acc' = acc++decls++[xdecl]
-              in runCC' xs acc' id'
+runCC mod = execWriter $ evalStateT (mapM_ runCC' mod) 0
+  where runCC' decl = do declcc <- closureConvert (declBody decl)
+                         tell [IrVal (declName decl) declcc]
