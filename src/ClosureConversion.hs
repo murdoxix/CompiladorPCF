@@ -50,7 +50,7 @@ closureConvert (IfZ _ c t e) = do irc <- closureConvert c
 closureConvert (Let _ v _ t e) = do irt <- closureConvert t
                                     v' <- produceName v
                                     ire <- closureConvert (open v' e)
-                                    return (IrLet v irt ire)
+                                    return (IrLet v' irt ire)
 
 closureConvert (App _ f x) = do irf <- closureConvert f
                                 irx <- closureConvert x
