@@ -16,7 +16,7 @@ import System.Console.Haskeline ( defaultSettings, getInputLine, runInputT, Inpu
 import Control.Monad.Catch (MonadMask)
 
 import Control.Monad.Trans
-import Data.List (nub,  intersperse, isPrefixOf )
+import Data.List ( nub,  intersperse, isPrefixOf )
 import Data.Char ( isSpace )
 import Data.Maybe ( fromJust, isJust )
 import Control.Exception ( catch , IOException )
@@ -63,12 +63,14 @@ main = execParser opts >>= go
       ( do modul <- verifyMod files
            printPCF "Resultado de CC:"
            mapM_ (printPCF . show) (runCC modul) )
+    go (LLVM, files) = undefined
 
 data Mode = Interactive
           | Typecheck
           | Bytecompile
           | Run
           | ClosureConversion
+          | LLVM
 
 -- | Parser de banderas
 parseMode :: Parser Mode
@@ -77,6 +79,7 @@ parseMode =
   <|> flag' Bytecompile (long "bytecompile" <> short 'c' <> help "Compilar a la BVM")
   <|> flag' Run (long "run" <> short 'r' <> help "Ejecutar bytecode en la BVM")
   <|> flag' ClosureConversion (long "cc" <> help "Imprime el resultado de hacer conversión de clausuras y hoisting")
+  <|> flag' LLVM (long "llvm" <> short 'l' <> help "Compila el código a  LLVM y lo ejecuta")
   <|> flag Interactive Interactive ( long "interactive" <> short 'i'<> help "Ejecutar en forma interactiva" )
 
 -- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar

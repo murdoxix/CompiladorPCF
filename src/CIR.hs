@@ -5,6 +5,8 @@ import Data.List ( intercalate )
 import Control.Monad.Writer
 import Control.Monad.State
 
+import Data.List ( isPrefixOf )
+
 newtype Reg = Temp String
   deriving Show
 
@@ -139,10 +141,10 @@ irToCanon (IrIfZ c t e) = do thenLoc <- getLoc "then"
 
                              return $ R r
 
-irToCanon (MkClosure v ts) = do tscanon <- mapM irToCanon ts
-                                r <- getReg
-                                addInst $ Assign r $ MkClosure v tscanon
-                                return $ R r
+irToCanon (Lang.MkClosure v ts) = do tscanon <- mapM irToCanon ts
+                                     r <- getReg
+                                     addInst $ Assign r $ CIR.MkClosure v tscanon
+                                     return $ R r
 
 irToCanon (IrAccess t n) = do tcanon <- irToCanon t
                               r <- getReg
@@ -164,7 +166,7 @@ getReg = do (n,l,i) <- get
             put (n+1,l,i)
             return $ Temp $ show n
 
-getLoc :: String -> CanonMonad Reg
+getLoc :: String -> CanonMonad Loc
 getLoc s = do (n,l,i) <- get
               put (n+1,l,i)
               return $ s ++ show n
