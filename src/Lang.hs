@@ -176,3 +176,5 @@ data IrDecl =
             irDeclArgNames :: [Name],
             irDeclBody     :: Ir }
   deriving Show
+
+type IrDecls = [IrDecl]
