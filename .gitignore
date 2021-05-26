@@ -16,4 +16,3 @@ compiladores.cabal
 *.out
 *.ll
 prog
-try.pcf

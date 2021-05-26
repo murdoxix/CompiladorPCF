@@ -16,7 +16,7 @@ import System.Console.Haskeline ( defaultSettings, getInputLine, runInputT, Inpu
 import Control.Monad.Catch (MonadMask)
 
 import Control.Monad.Trans
-import Data.List ( nub,  intersperse, isPrefixOf )
+import Data.List ( nub, intersperse, isPrefixOf )
 import Data.Char ( isSpace )
 import Data.Maybe ( fromJust, isJust )
 import Control.Exception ( catch , IOException )
