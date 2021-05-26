@@ -79,6 +79,7 @@ pattern DROP     = 13
 pattern PRINT    = 14
 pattern SUM      = 15
 pattern SUB      = 16
+pattern PROD     = 17
 
 bc :: MonadPCF m => Term -> m Bytecode
 bc (V _ (Bound i)) = return [ACCESS, i]
@@ -100,6 +101,13 @@ bc (BinaryOp _ Sum t1 t2) = do ct1 <- bc t1
 bc (BinaryOp _ Sub t1 t2) = do ct1 <- bc t1
                                ct2 <- bc t2 
                                return (ct1++ct2++[SUB])
+
+bc (BinaryOp _ Prod t1 t2) = do ct1 <- bc t1
+                                ct2 <- bc t2 
+                                return (ct1++ct2++[PROD])
+
+bc (Print _ t) = do ct <- bc t
+                    return (ct++[PRINT])
 
 bc (Fix _ _ _ _ _ e) = bc e >>= (\ce -> return ([FUNCTION, length ce + 1]++ce++[RETURN, FIX]))
 
@@ -130,12 +138,8 @@ bt t = bc t >>= (\ct -> return (ct++[RETURN]))
 bytecompileModule :: MonadPCF m => Module -> m Bytecode
 bytecompileModule mod = translate mod >>= bc >>= (\cmod -> return $ cmod ++ [PRINT, STOP])
   where
-    translate [] = failPCF "Error de compilación de módulo. Debe haber al menos una declaración."
-    translate ((Decl{declPos = p, declName = v, declType = ty, declBody = e}):[]) =
-      if ty == NatTy
-        then return e
-        else failPCF "Error de compilación de módulo. La última declaración debe ser de tipo Nat."
-    translate ((Decl{declPos = p, declName = v, declType = ty, declBody = e}):xs) =
+    translate ( [Decl{declBody = e}] )  = return e
+    translate ( (Decl{declPos = p, declName = v, declType = ty, declBody = e}) : xs ) =
       translate xs >>= (\txs -> return (Let p v ty e (close v txs)))
 
 -- | Toma un bytecode, lo codifica y lo escribe un archivo 
@@ -169,6 +173,8 @@ runBVM (TAILCALL:c) e (v:(Fun ef cf):s) = runBVM cf (v:ef) s
 runBVM (SUM:c) e ((I n2):(I n1):s) = runBVM c e ((I (n1+n2)):s)
 
 runBVM (SUB:c) e ((I n2):(I n1):s) = runBVM c e ((I (n1-n2)):s)
+
+runBVM (PROD:c) e ((I n2):(I n1):s) = runBVM c e ((I (n1*n2)):s)
 
 runBVM (IFZ:lct1:c) e ((I ve):s) = if ve == 0
                                      then runBVM c e s

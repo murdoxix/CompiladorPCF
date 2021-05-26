@@ -20,6 +20,8 @@ module Lang where
 
 import Common ( Pos )
 
+import Data.List ( nub )
+
 -- | AST de Tipos superficiales
 data SugaredTy info =
       SNatTy
@@ -49,10 +51,10 @@ type Name = String
 data Const = CNat Int
   deriving Show
 
-data UnaryOp = Succ | Pred
+data UnaryOp = Succ | Pred | UPrint
   deriving (Show,Eq)
 
-data BinaryOp = Sum | Sub
+data BinaryOp = Sum | Sub | Prod
   deriving (Show,Eq)
 
 -- | tipo de datos de declaraciones azucaradas, parametrizado por el tipo del cuerpo de la declaración
@@ -99,6 +101,7 @@ data Tm info var =
   | Fix info Name Ty Name Ty (Tm info var)
   | IfZ info (Tm info var) (Tm info var) (Tm info var)
   | Let info Name Ty (Tm info var) (Tm info var)
+  | Print info (Tm info var)
   deriving (Show, Functor)
 
 type NTerm = Tm Pos Name   -- ^ 'Tm' tiene 'Name's como variables ligadas y libres, guarda posición
@@ -121,18 +124,21 @@ getInfo (BinaryOp i _ _ _) = i
 getInfo (Fix i _ _ _ _ _)  = i
 getInfo (IfZ i _ _ _)      = i
 getInfo (Let i _ _ _ _)    = i
+getInfo (Print i _)        = i
 
 -- | Obtiene las variables libres de un término LC.
 freeVars :: Tm info Var -> [Name]
-freeVars (V _ (Free v))       = [v]
-freeVars (V _ _)              = []
-freeVars (Lam _ _ _ t)        = freeVars t
-freeVars (App _ l r)          = freeVars l ++ freeVars r
-freeVars (BinaryOp _ _ e1 e2) = freeVars e1 ++ freeVars e2
-freeVars (Fix _ _ _ _ _ t)    = freeVars t
-freeVars (IfZ _ c t e)        = freeVars c ++ freeVars t ++ freeVars e
-freeVars (Const _ _)          = []
-freeVars (Let _ _ _ e1 e2)    = freeVars e1 ++ freeVars e2
+freeVars = nub . freeVars'
+  where freeVars' (V _ (Free v))       = [v]
+        freeVars' (V _ _)              = []
+        freeVars' (Lam _ _ _ t)        = freeVars' t
+        freeVars' (App _ l r)          = freeVars' l ++ freeVars' r
+        freeVars' (BinaryOp _ _ e1 e2) = freeVars' e1 ++ freeVars' e2
+        freeVars' (Fix _ _ _ _ _ t)    = freeVars' t
+        freeVars' (IfZ _ c t e)        = freeVars' c ++ freeVars' t ++ freeVars' e
+        freeVars' (Const _ _)          = []
+        freeVars' (Let _ _ _ e1 e2)    = freeVars' e1 ++ freeVars' e2
+        freeVars' (Print _ t)          = freeVars' t
 
 -- | Clausura. El término incluye a Lam o Fix.
 data Clos = Clos Env Term
@@ -166,6 +172,7 @@ data Ir =
   | IrIfZ Ir Ir Ir
   | MkClosure Name [Ir]
   | IrAccess Ir Int
+  | IrPrint Ir
   deriving Show
 
 data IrDecl =
@@ -176,3 +183,5 @@ data IrDecl =
             irDeclArgNames :: [Name],
             irDeclBody     :: Ir }
   deriving Show
+
+type IrDecls = [IrDecl]

@@ -29,7 +29,10 @@ dependencies:
 - optparse-applicative
 - binary
 - bytestring
-
+- llvm-hs-pure
+- llvm-hs-pretty
+- process
+- text
 
 library:
   source-dirs: src

@@ -16,22 +16,27 @@ funciones son top-level.
 module ClosureConversion ( runCC ) where
 
 import Lang
-import Subst ( openN )
+import Subst ( openN, open )
 import Control.Monad.State
 import Control.Monad.Writer
 import Data.List ( isPrefixOf )
 
-produceid :: CCState Name
-produceid = do id <- get
-               put (id+1)
-               return (show id)
+produceName :: String -> CCState Name
+produceName s = do id <- get
+                   put (id+1)
+                   return $ "__" ++ s ++ (show id)
 
 type CCState a = StateT Int (Writer [IrDecl]) a
 
 closureConvert :: Term -> CCState Ir
 closureConvert (V _ (Free v)) = return (IrVar v)
 
+closureConvert (V _ (Bound n)) = error "ClosureConversion: no deberia haber variables ligadas acá"
+
 closureConvert (Const _ n) = return (IrConst n)
+
+closureConvert (Print _ t) = do irt <- closureConvert t
+                                return (IrPrint irt)
 
 closureConvert (BinaryOp _ b t e) = do irt <- closureConvert t
                                        ire <- closureConvert e
@@ -43,8 +48,9 @@ closureConvert (IfZ _ c t e) = do irc <- closureConvert c
                                   return (IrIfZ irc irt ire)
 
 closureConvert (Let _ v _ t e) = do irt <- closureConvert t
-                                    ire <- closureConvert e
-                                    return (IrLet v irt ire)
+                                    v' <- produceName v
+                                    ire <- closureConvert (open v' e)
+                                    return (IrLet v' irt ire)
 
 closureConvert (App _ f x) = do irf <- closureConvert f
                                 irx <- closureConvert x
@@ -58,19 +64,16 @@ closureConvert (Fix _ n _ x _ e) = closureConvertFun [n,x] e
 -- es decir, las Lam y Fix. Si vars tiene un elemento es el caso Lam,
 -- si tiene dos elementos es un Fix. No hay otro caso.
 closureConvertFun :: [Name] -> Term -> CCState Ir
-closureConvertFun vars e = do idfun <- produceid
-                              idvars <- mapM (\_ -> produceid) vars
-                              let vars' = map (\(v,id) -> "__"++v++id) (zip vars idvars)
-                                  opene = openN vars' e
+closureConvertFun vars e = do irfunName <- produceName ""
+                              vars' <- mapM produceName vars
+                              let opene = openN vars' e
                               ire <- closureConvert opene
-                              idclo <- produceid
+                              cloName <- produceName "clo"
                               let freeVarse = freeNestedVars e
                                   indexedFreeVars =
                                     case length vars of
                                       1 -> zip3 freeVarse [1..] (cycle [cloName])
                                       2 -> zip3 (freeVarse++[vars'!!0]) [1..] (cycle [cloName])
-                                  cloName = "__clo"++idclo
-                                  irfunName = "__"++idfun
                                   irfunArgNames = [cloName, last vars']
                                   irfunBody = foldl aux ire indexedFreeVars
                                   irfun = IrFun { irDeclName = irfunName,
@@ -88,11 +91,6 @@ freeNestedVars :: Term -> [Name]
 freeNestedVars t = filter ("__" `isPrefixOf`) (freeVars t)
 
 runCC :: Module -> IrDecls
-runCC mod = runCC' mod [] 0
-  where runCC' [] acc _ = acc
-        runCC' (x:xs) acc id =
-          let ((ir, id'), decls) = runWriter $ runStateT (closureConvert (declBody x)) id
-              xdecl = IrVal { irDeclName = declName x,
-                              irDeclDef = ir }
-              acc' = acc++decls++[xdecl]
-              in runCC' xs acc' id'
+runCC mod = execWriter $ evalStateT (mapM_ runCC' mod) 0
+  where runCC' decl = do declcc <- closureConvert (declBody decl)
+                         tell [IrVal (declName decl) declcc]

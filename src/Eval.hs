@@ -51,6 +51,13 @@ eval (BinaryOp p Sub t e) = do
           (Const _ (CNat n), Const _ (CNat m)) -> return (Const p (CNat (max 0 (n-m))))
           _                -> abort ("Error de tipo en runtime!")
 
+eval (BinaryOp p Prod t e) = do
+        te <- eval t
+        ee <- eval e
+        case (te, ee) of
+          (Const _ (CNat n), Const _ (CNat m)) -> return (Const p (CNat (max 0 (n*m))))
+          _                -> abort ("Error de tipo en runtime!")
+
 eval (IfZ p c t e) = do
      ce <- eval c
      case ce of

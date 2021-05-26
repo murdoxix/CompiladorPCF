@@ -59,6 +59,7 @@
 #define PRINT    14
 #define SUM      15
 #define SUB      16
+#define PROD     17
 #define ADD      20
 
 #define CHUNK 4096
@@ -242,6 +243,14 @@ void run(code init_c)
 				s[-2].i -= s[-1].i;
       else
         s[-2].i = 0;
+      s--;
+			break;
+		}
+
+		case PROD: {
+			/* Producto: en el tope de la pila esta el segundo argumento
+       * y por debajo el primero, los multiplicamos. */      
+      s[-2].i *= s[-1].i;
       s--;
 			break;
 		}

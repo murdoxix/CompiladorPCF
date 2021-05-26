@@ -15,19 +15,22 @@ module Main where
 import System.Console.Haskeline ( defaultSettings, getInputLine, runInputT, InputT )
 import Control.Monad.Catch (MonadMask)
 
---import Control.Monad
 import Control.Monad.Trans
-import Data.List (nub,  intersperse, isPrefixOf )
+import Data.List ( nub, intersperse, isPrefixOf )
 import Data.Char ( isSpace )
 import Data.Maybe ( fromJust, isJust )
 import Control.Exception ( catch , IOException )
 import System.Environment ( getArgs )
 import System.IO ( stderr, hPutStr )
 import Options.Applicative
+import LLVM.Pretty ( ppllvm )
+import System.Process ( callCommand )
+import Data.Text.IO as TIO ( writeFile )
+import Data.Text.Lazy as TIO ( toStrict )
 
 import Global ( GlEnv(..) )
 import Errors
-import Lang
+import Lang hiding ( Print )
 import Parse ( P, tm, program, declOrTm, runP )
 import Elab ( elab, elab_decl, desugar )
 import Bytecompile ( bytecompileModule, bcWrite, runBC, bcRead )
@@ -36,6 +39,9 @@ import PPrint ( pp , ppTy )
 import MonadPCF
 import TypeChecker ( tc, tcDecl )
 import ClosureConversion ( runCC )
+import CIR ( runCanon )
+import InstSel ( codegen )
+
 
 prompt :: String
 prompt = "PCF> "
@@ -51,27 +57,36 @@ main = execParser opts >>= go
     go :: (Mode,[FilePath]) -> IO ()
     go (Interactive,files) = void $ runPCF $ catchErrors $ runInputT defaultSettings (repl files)
     go (Typecheck, files) = void $ runPCF $ catchErrors $ verifyFiles files
-    go (Bytecompile, files) = void $ runPCF $ catchErrors $
-      ( do asModules <- verifyFiles files
-           let oneModule = foldl (++) [] asModules
-           bytecode <- bytecompileModule oneModule
+    go (Bytecompile, files) = void $ runPCF $ catchErrors
+      ( do modul <- verifyMod files
+           bytecode <- bytecompileModule modul
            let lastFile = last files
                fileByte = ((++ "byte") . take (length lastFile - 3)) lastFile
            liftIO $ bcWrite bytecode fileByte )
     go (Run, files) = void $ runPCF $ catchErrors
       ( do asBytecodes <- liftIO $ mapM bcRead files
            mapM_ runBC asBytecodes )
-    go (ClosureConversion, files) = void $ runPCF $ catchErrors $
-      ( do mods <- verifyFiles files
-           let mod = foldl (++) [] mods
+    go (AST, files) = void $ runPCF $ catchErrors
+      ( do modul <- verifyMod files
+           mapM_ (printPCF . show) modul )
+    go (ClosureConversion, files) = void $ runPCF $ catchErrors
+      ( do modul <- verifyMod files
            printPCF "Resultado de CC:"
-           mapM_ (printPCF . show) (runCC mod) )
+           mapM_ (printPCF . show) (runCC modul) )
+    go (LLVM, files) = void $ runPCF $ catchErrors
+      ( do modul <- verifyMod files
+           let llvm = codegen $ runCanon $ runCC modul
+               commandline = "clang -Wno-override-module output.ll runtime.c -lgc -o prog"
+           liftIO $ TIO.writeFile "output.ll" (toStrict (ppllvm llvm))
+           liftIO $ callCommand commandline )
 
 data Mode = Interactive
           | Typecheck
           | Bytecompile
           | Run
+          | AST
           | ClosureConversion
+          | LLVM
 
 -- | Parser de banderas
 parseMode :: Parser Mode
@@ -79,7 +94,9 @@ parseMode =
       flag' Typecheck ( long "typecheck" <> short 't' <> help "Solo chequear tipos")
   <|> flag' Bytecompile (long "bytecompile" <> short 'c' <> help "Compilar a la BVM")
   <|> flag' Run (long "run" <> short 'r' <> help "Ejecutar bytecode en la BVM")
+  <|> flag' AST (long "ast" <> short 'a' <> help "Imprime el AST del módulo entero")
   <|> flag' ClosureConversion (long "cc" <> help "Imprime el resultado de hacer conversión de clausuras y hoisting")
+  <|> flag' LLVM (long "llvm" <> short 'l' <> help "Compila el código a  LLVM y guarda el ejectuable \"prog\"")
   <|> flag Interactive Interactive ( long "interactive" <> short 'i'<> help "Ejecutar en forma interactiva" )
 
 -- | Parser de opciones general, consiste de un modo y una lista de archivos a procesar
@@ -104,7 +121,19 @@ repl args = do
                        b <- lift $ catchErrors $ handleCommand c
                        maybe loop (flip when loop) b
 
-verifyFiles ::  MonadPCF m => [String] -> m [Module]
+-- Toma una lista de archivos con código fuente y devuelve un único Module.
+-- Chequea que haya al menos un archivo y que la última declaración sea
+-- de tipo Nat.
+verifyMod :: MonadPCF m => [String] -> m Module
+verifyMod []    = failPCF "Error de compilación de módulo. Debe haber al menos una declaración."
+verifyMod files = do mods <- verifyFiles files
+                     let modul = foldl (++) [] mods
+                         isNatTheLast = (declType (last modul)) == NatTy
+                     if isNatTheLast
+                       then return modul
+                       else failPCF "Error de compilación de módulo. La última declaración debe ser de tipo Nat."
+
+verifyFiles :: MonadPCF m => [String] -> m [Module]
 verifyFiles [] = return []
 verifyFiles (x:xs) = do
         modify (\s -> s { lfile = x, inter = False })

@@ -34,6 +34,9 @@ tc (BinaryOp p b t u) bs = do
       expect NatTy tyt t
       tyu <- tc u bs
       expect NatTy tyu u
+tc (Print p t) bs = do
+      tyt <- tc t bs
+      expect NatTy tyt t
 tc (IfZ p c t t') bs = do
        tyc  <- tc c bs
        expect NatTy tyc c
