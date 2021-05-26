@@ -20,6 +20,8 @@ module Lang where
 
 import Common ( Pos )
 
+import Data.List ( nub )
+
 -- | AST de Tipos superficiales
 data SugaredTy info =
       SNatTy
@@ -126,16 +128,17 @@ getInfo (Print i _)        = i
 
 -- | Obtiene las variables libres de un término LC.
 freeVars :: Tm info Var -> [Name]
-freeVars (V _ (Free v))       = [v]
-freeVars (V _ _)              = []
-freeVars (Lam _ _ _ t)        = freeVars t
-freeVars (App _ l r)          = freeVars l ++ freeVars r
-freeVars (BinaryOp _ _ e1 e2) = freeVars e1 ++ freeVars e2
-freeVars (Fix _ _ _ _ _ t)    = freeVars t
-freeVars (IfZ _ c t e)        = freeVars c ++ freeVars t ++ freeVars e
-freeVars (Const _ _)          = []
-freeVars (Let _ _ _ e1 e2)    = freeVars e1 ++ freeVars e2
-freeVars (Print _ t)          = freeVars t
+freeVars = nub . freeVars'
+  where freeVars' (V _ (Free v))       = [v]
+        freeVars' (V _ _)              = []
+        freeVars' (Lam _ _ _ t)        = freeVars' t
+        freeVars' (App _ l r)          = freeVars' l ++ freeVars' r
+        freeVars' (BinaryOp _ _ e1 e2) = freeVars' e1 ++ freeVars' e2
+        freeVars' (Fix _ _ _ _ _ t)    = freeVars' t
+        freeVars' (IfZ _ c t e)        = freeVars' c ++ freeVars' t ++ freeVars' e
+        freeVars' (Const _ _)          = []
+        freeVars' (Let _ _ _ e1 e2)    = freeVars' e1 ++ freeVars' e2
+        freeVars' (Print _ t)          = freeVars' t
 
 -- | Clausura. El término incluye a Lam o Fix.
 data Clos = Clos Env Term
