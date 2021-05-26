@@ -66,6 +66,9 @@ main = execParser opts >>= go
     go (Run, files) = void $ runPCF $ catchErrors
       ( do asBytecodes <- liftIO $ mapM bcRead files
            mapM_ runBC asBytecodes )
+    go (AST, files) = void $ runPCF $ catchErrors
+      ( do modul <- verifyMod files
+           mapM_ (printPCF . show) modul )
     go (ClosureConversion, files) = void $ runPCF $ catchErrors
       ( do modul <- verifyMod files
            printPCF "Resultado de CC:"
@@ -81,6 +84,7 @@ data Mode = Interactive
           | Typecheck
           | Bytecompile
           | Run
+          | AST
           | ClosureConversion
           | LLVM
 
@@ -90,6 +94,7 @@ parseMode =
       flag' Typecheck ( long "typecheck" <> short 't' <> help "Solo chequear tipos")
   <|> flag' Bytecompile (long "bytecompile" <> short 'c' <> help "Compilar a la BVM")
   <|> flag' Run (long "run" <> short 'r' <> help "Ejecutar bytecode en la BVM")
+  <|> flag' AST (long "ast" <> short 'a' <> help "Imprime el AST del módulo entero")
   <|> flag' ClosureConversion (long "cc" <> help "Imprime el resultado de hacer conversión de clausuras y hoisting")
   <|> flag' LLVM (long "llvm" <> short 'l' <> help "Compila el código a  LLVM y guarda el ejectuable \"prog\"")
   <|> flag Interactive Interactive ( long "interactive" <> short 'i'<> help "Ejecutar en forma interactiva" )
