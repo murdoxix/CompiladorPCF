@@ -19,6 +19,7 @@ module MonadPCF (
   runPCF,
   lookupDecl,
   lookupTy,
+  getDecls,
   printPCF,
   failPosPCF,
   failPCF,
@@ -60,7 +61,7 @@ printPCF = liftIO . putStrLn
 
 addDecl :: MonadPCF m => Decl Term -> m ()
 addDecl d = modify (\s -> s { glb = d : glb s })
-  
+
 addTy :: MonadPCF m => Name -> Ty -> m ()
 addTy n ty = modify (\s -> s { tyEnv = (n,ty) : tyEnv s })
 
@@ -79,6 +80,10 @@ lookupTy nm = do
       s <- get
       return $ lookup nm (tyEnv s)
 
+getDecls :: MonadPCF m => m Module
+getDecls = do s <- get
+              return $ reverse $ glb s
+
 failPosPCF :: MonadPCF m => Pos -> String -> m a
 failPosPCF p s = throwError (ErrPos p s)
 
@@ -86,8 +91,8 @@ failPCF :: MonadPCF m => String -> m a
 failPCF = failPosPCF NoPos
 
 catchErrors  :: MonadPCF m => m a -> m (Maybe a)
-catchErrors c = catchError (Just <$> c) 
-                           (\e -> liftIO $ hPutStrLn stderr (show e) 
+catchErrors c = catchError (Just <$> c)
+                           (\e -> liftIO $ hPutStrLn stderr (show e)
                               >> return Nothing)
 
 ----
