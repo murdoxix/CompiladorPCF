@@ -126,20 +126,18 @@ repl args = do
 -- de tipo Nat.
 verifyMod :: MonadPCF m => [String] -> m Module
 verifyMod []    = failPCF "Error de compilación de módulo. Debe haber al menos una declaración."
-verifyMod files = do mods <- verifyFiles files
-                     let modul = foldl (++) [] mods
-                         isNatTheLast = (declType (last modul)) == NatTy
-                     if isNatTheLast
-                       then return modul
-                       else failPCF "Error de compilación de módulo. La última declaración debe ser de tipo Nat."
+verifyMod files = do verifyFiles files
+                     modul <- getDecls
+                     let isNatTheLast = (declType (last modul)) == NatTy
+                     when (not isNatTheLast) $ failPCF "Error de compilación de módulo. La última declaración debe ser de tipo Nat."
+                     return modul
 
-verifyFiles :: MonadPCF m => [String] -> m [Module]
-verifyFiles [] = return []
+verifyFiles :: MonadPCF m => [String] -> m ()
+verifyFiles [] = return ()
 verifyFiles (x:xs) = do
-        modify (\s -> s { lfile = x, inter = False })
-        verified <- verifyFile x
-        restVerified <- verifyFiles xs
-        return (verified : restVerified)
+       modify (\s -> s { lfile = x, inter = False })
+       verifyFile x
+       verifyFiles xs
 
 compileFiles ::  MonadPCF m => [String] -> m ()
 compileFiles []     = return ()
@@ -162,22 +160,20 @@ parseFile f = do
 compileFile :: MonadPCF m => String -> m ()
 compileFile f = parseFile f >>= mapM_ handleDecl
 
-verifyFile :: MonadPCF m => String -> m Module
-verifyFile f = parseFile f >>= mapM verifyDecl >>= return.(map fromJust).(filter isJust)
+verifyFile :: MonadPCF m => String -> m ()
+verifyFile f = parseFile f >>= mapM_ verifyDecl
 
 parseIO ::  MonadPCF m => String -> P a -> String -> m a
 parseIO filename p x = case runP p x filename of
                   Left e  -> throwError (ParseErr e)
                   Right r -> return r
 
-verifyDecl ::  MonadPCF m => SDecl STerm -> m (Maybe (Decl Term))
+verifyDecl ::  MonadPCF m => SDecl STerm -> m ()
 verifyDecl d = do
         mde <- elab_decl d
-        case mde of
-          Nothing -> return Nothing
-          Just de@(Decl p x ty t) ->
-            do tcDecl de
-               return $ Just de
+        forM_ mde (\decl -> do
+          tcDecl decl
+          addDecl decl)
 
 handleDecl ::  MonadPCF m => SDecl STerm -> m ()
 handleDecl d = do
